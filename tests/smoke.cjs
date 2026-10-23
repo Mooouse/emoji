@@ -42,6 +42,21 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     assert(ui.tabNames.every(x=>!/[😀🐶🥭⚽🏖🕯⭕🚩]/u.test(x)),'Category navigation still uses emoji icons');
     assert(ui.recentBelowTabs&&ui.recentLabel==='Недавно использованные','Recent section is not below categories');
     assert.equal(ui.viewportPosition,'sticky','Emoji canvas must use native sticky scrolling');
+    await page.waitForFunction(()=>!!flagAtlasImage&&flagAtlasImage.naturalWidth>0,{timeout:10000});
+    const flags=await page.evaluate(()=>{
+      const all=entries.filter(e=>e.cat==='flags');
+      const country=all.find(e=>e.native==='🇺🇸');
+      const idx=country?.flagIndex??-1;
+      const proof=document.createElement('canvas');
+      proof.width=80;proof.height=80;
+      if(idx>=0)proof.getContext('2d').drawImage(flagAtlasImage,(idx%ATLAS_COLS)*ATLAS_TILE,Math.floor(idx/ATLAS_COLS)*ATLAS_TILE,ATLAS_TILE,ATLAS_TILE,0,0,80,80);
+      const img=proof.getContext('2d').getImageData(40,40,1,1).data;
+      return {count:all.length,ready:flagAtlasImage.complete,pixels:[...img],sheet:[flagAtlasImage.naturalWidth,flagAtlasImage.naturalHeight]};
+    });
+    console.log('flags',flags);
+    assert.equal(flags.count,269,'Flags are missing from the catalogue');
+    assert(flags.ready&&flags.sheet[0]>=2560,'Pre-rendered country flag atlas did not load');
+    assert(flags.pixels[3]>0,'Country flag tile is transparent or missing');
     assert(state.atlas,'Emoji texture atlas failed to generate');
     assert(state.domEmojiButtons===0,'Emoji DOM glyphs still exist');
     assert(state.fullHeight>state.viewport,'Not all emojis are reachable by scrolling');
@@ -95,6 +110,15 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     assert(hoverState.hoveredName,'Hover did not identify an emoji');
     assert(hoverState.tooltipVisible,'Russian emoji name tooltip was not shown');
     assert.equal(hoverState.tooltipText,hoverState.hoveredName,'Tooltip name mismatch');
+    const tooltipAlignment=await page.evaluate(()=>{
+      const card=document.querySelector('#emoji-hover-indicator').getBoundingClientRect();
+      const tooltip=document.querySelector('#emoji-hover-tooltip').getBoundingClientRect();
+      return {cardCenter:card.left+card.width/2,labelCenter:tooltip.left+tooltip.width/2,
+        withinBlock:tooltip.left>=document.querySelector('#emoji-viewport').getBoundingClientRect().left-2};
+    });
+    console.log('centered tooltip',tooltipAlignment);
+    assert(Math.abs(tooltipAlignment.cardCenter-tooltipAlignment.labelCenter)<2,'Tooltip is off-center from hovered emoji');
+    assert(tooltipAlignment.withinBlock,'Tooltip extends outside its visible area');
     const recent=await page.evaluate(()=>{
       history=['😂','🌌'];
       renderRecent();
