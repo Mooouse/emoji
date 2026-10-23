@@ -463,6 +463,59 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     console.log('color controls',colors);
     assert.equal(colors.background,'rgb(18, 52, 86)');
     assert(colors.card.startsWith('#')&&colors.border.startsWith('#'));
+
+    // Startup performance regression: simulate a busy browser that cannot
+    // run idle tasks at all. Visible emojis must still appear immediately,
+    // and scrolling must paint not-yet-cached sprites on demand.
+    const startup=await browser.newPage();
+    try{
+      await startup.setViewport({width:1440,height:900,deviceScaleFactor:1});
+      await startup.evaluateOnNewDocument(()=>{
+        window.__heldIdleCallbacks=[];
+        window.requestIdleCallback=callback=>{
+          window.__heldIdleCallbacks.push(callback);
+          return window.__heldIdleCallbacks.length;
+        };
+      });
+      await startup.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded'});
+      await startup.waitForFunction(()=>typeof firstEmojiPaintMs==='number'&&firstEmojiPaintMs>0,{timeout:20000});
+      const early=await startup.evaluate(()=>({
+        firstPaint:Math.round(firstEmojiPaintMs),
+        atlasPainted:atlasReadyCount,
+        total:entries.length,
+        visible:lastDrawMetrics.icons,
+        idleQueued:window.__heldIdleCallbacks.length,
+        preload:!!document.querySelector('link[rel="preload"][as="fetch"][href="./emoji-data.json"]'),
+        flagDeferred:flagAtlasStarted
+      }));
+      console.log('first emoji paint (idle blocked)',early);
+      assert(early.visible>0,'No emoji were visible on first paint');
+      assert(early.atlasPainted>0&&early.atlasPainted<early.total,
+        'Startup still renders all 1870 emoji before showing anything');
+      assert(early.preload,'Emoji JSON did not get early preload priority');
+      await startup.evaluate(()=>{
+        const c=document.querySelector('#catalog');
+        c.scrollTop=c.scrollHeight-c.clientHeight;
+      });
+      await startup.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      const scrolled=await startup.evaluate(()=>{
+        const start=findRow(catalog.scrollTop);
+        const end=Math.min(model.length,findRow(catalog.scrollTop+surfaceHeight)+1);
+        const visible=[];
+        for(let i=start;i<end;i++)if(model[i].kind==='emojis')visible.push(...model[i].items);
+        return {
+          icons:lastDrawMetrics.icons,
+          ready:visible.every(item=>atlasPainted[item.atlasIndex]===1),
+          totalPrepared:atlasReadyCount,
+          warmed:atlasWarmCursor
+        };
+      });
+      console.log('uncached last-page scroll',scrolled);
+      assert(scrolled.icons>0&&scrolled.ready,'Fast scroll showed blank emoji while idle work was blocked');
+      assert(scrolled.totalPrepared<early.total,'Scrolling forced the entire sprite atlas to generate');
+    }finally{
+      await startup.close();
+    }
     assert(!errors.length,'JavaScript browser errors: '+errors.join(' | '));
     console.log('Native emoji atlas and instant canvas scrolling: browser tests PASSED');
   }finally{
