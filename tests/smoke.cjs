@@ -42,7 +42,7 @@ const sleep = ms => new Promise(resolve=>setTimeout(resolve,ms));
     assert(state.found.includes('Найдено:')&&state.visible>0,'Russian search returned no rendered emojis');
     await page.locator('#grid-toggle').click();
     await page.locator('#catalog-hex').fill('#123456');
-    await page.locator('#catalog-hex').press('Tab');
+    await page.keyboard.press('Tab');
     await sleep(100);
     const colors=await page.evaluate(()=>({
       catalog:getComputedStyle(document.getElementById('catalog')).backgroundColor,
