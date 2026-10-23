@@ -360,7 +360,7 @@ let spriteAtlas=null;
 let viewCanvas=null,viewContext=null;
 let surfaceWidth=0,surfaceHeight=0,surfaceDpr=1,drawOrigin=0;
 let frameId=0,atlasMs=0;
-let hoveredItem=null,keyboardIndex=-1;
+let hoveredItem=null,keyboardIndex=-1,currentNavTab='';
 let lastDrawMetrics={rows:0,icons:0,ms:0};
 function makeAtlas(){
   if(!entries.length)return;
