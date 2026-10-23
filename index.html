@@ -190,6 +190,20 @@ html.dark .recent-emoji{color:#f5f5f5;background:#252525;border-color:#363636}
 html.dark .recent-emoji:hover{background:#3b2d22;border-color:#a77757}
 @media(max-width:680px){.nav .tab{font-size:12px;height:37px;padding:0 12px}.recent-panel{padding:12px}.recent-emoji{width:38px;height:38px;font-size:25px}}
 
+
+/* Scrolling and hover overlays are fixed to the sticky viewport, not moved by JS. */
+#emoji-sticky-surface{position:sticky;top:0;left:0;isolation:isolate}
+#emoji-viewport{transform:none!important}
+#emoji-hover-tooltip{
+  position:absolute;z-index:3;pointer-events:none;
+  max-width:240px;width:max-content;white-space:normal;
+  color:white;background:#24272c;border:1px solid #3c414b;
+  box-shadow:0 8px 23px #0005;border-radius:8px;
+  font:500 12px/1.35 Arial,sans-serif;padding:7px 10px;
+  text-align:center;
+}
+#emoji-hover-tooltip[hidden]{display:none!important}
+
 </style></head>
 <body>
 <header class="top"><div class="topin"><a href="./" class="logo">emoji<span>.</span></a>
@@ -407,7 +421,7 @@ let viewCanvas=null,viewContext=null;
 let surfaceWidth=0,surfaceHeight=0,surfaceDpr=1,drawOrigin=0;
 let frameId=0,atlasMs=0;
 let hoveredItem=null,keyboardIndex=-1,currentNavTab='';
-let hoverIndicator=null,canvasRenderCount=0;
+let hoverIndicator=null,hoverTooltip=null,surfaceRoot=null,canvasRenderCount=0;
 let lastDrawMetrics={rows:0,icons:0,ms:0};
 function makeAtlas(){
   if(!entries.length)return;
@@ -448,14 +462,25 @@ function ensureCanvas(){
   viewCanvas.tabIndex=0;
   viewCanvas.setAttribute('role','img');
   viewCanvas.setAttribute('aria-label','Сетка эмодзи. Нажмите на эмодзи для копирования.');
+  // A sticky surface follows native scrolling immediately, with no delayed
+  // transform from a scroll event or asynchronous compositor frame.
+  surfaceRoot=document.createElement('div');
+  surfaceRoot.id='emoji-sticky-surface';
+  surfaceRoot.style.cssText='position:sticky;top:0;left:0;z-index:1;width:100%;pointer-events:auto;';
+  layer.appendChild(surfaceRoot);
   viewCanvas.style.cssText='position:absolute;top:0;left:0;display:block;touch-action:pan-y;outline-offset:-3px;';
-  viewContext=viewCanvas.getContext('2d',{alpha:false,desynchronized:true});
-  layer.appendChild(viewCanvas);
+  viewContext=viewCanvas.getContext('2d',{alpha:false});
+  surfaceRoot.appendChild(viewCanvas);
   hoverIndicator=document.createElement('div');
   hoverIndicator.id='emoji-hover-indicator';
   hoverIndicator.hidden=true;
   hoverIndicator.setAttribute('aria-hidden','true');
-  layer.appendChild(hoverIndicator);
+  surfaceRoot.appendChild(hoverIndicator);
+  hoverTooltip=document.createElement('div');
+  hoverTooltip.id='emoji-hover-tooltip';
+  hoverTooltip.setAttribute('role','tooltip');
+  hoverTooltip.hidden=true;
+  surfaceRoot.appendChild(hoverTooltip);
   viewCanvas.addEventListener('mousemove',onPointerHover,{passive:true});
   viewCanvas.addEventListener('mouseleave',()=>hideHover());
   viewCanvas.addEventListener('click',event=>{
@@ -487,6 +512,7 @@ function resizeSurface(){
   const dpr=Math.min(window.devicePixelRatio||1,1.5);
   if(width===surfaceWidth&&height===surfaceHeight&&dpr===surfaceDpr)return;
   surfaceWidth=width;surfaceHeight=height;surfaceDpr=dpr;
+  surfaceRoot.style.height=height+'px';
   viewCanvas.style.width=width+'px';
   viewCanvas.style.height=height+'px';
   viewCanvas.width=Math.round(width*dpr);
@@ -494,12 +520,8 @@ function resizeSurface(){
   viewContext.setTransform(dpr,0,0,dpr,0,0);
 }
 function getCanvasLocation(){
-  const rect=catalog.getBoundingClientRect();
-  const extra=Math.max(0,Math.min(catalog.clientHeight-surfaceHeight,-rect.top));
-  return {
-    origin:catalog.scrollTop+extra,
-    canvasOffset:catalog.scrollTop+extra
-  };
+  // Sticky canvas is always anchored to the scroll viewport by layout.
+  return {origin:catalog.scrollTop};
 }
 function drawRoundRect(ctx,x,y,w,h,r,fill,stroke){
   if(w<=1||h<=1)return;
@@ -529,7 +551,6 @@ function drawViewport(){
   resizeSurface();
   const loc=getCanvasLocation();
   drawOrigin=loc.origin;
-  viewCanvas.style.transform='translate3d(0,'+loc.canvasOffset+'px,0)';
   const t=performance.now(),ctx=viewContext;
   const colors=themeColors();
   ctx.clearRect(0,0,surfaceWidth,surfaceHeight);
@@ -607,6 +628,7 @@ function hitTest(event){
 function hideHover(){
   hoveredItem=null;
   if(hoverIndicator)hoverIndicator.hidden=true;
+  if(hoverTooltip)hoverTooltip.hidden=true;
   if(viewCanvas)viewCanvas.style.cursor='default';
 }
 function onPointerHover(event){
@@ -617,9 +639,20 @@ function onPointerHover(event){
   viewCanvas.style.cursor='pointer';
   hoverIndicator.style.width=hit.width+'px';
   hoverIndicator.style.height=cellHeight+'px';
-  hoverIndicator.style.transform='translate3d('+hit.left+'px,'+hit.top+'px,0)';
+  const localTop=hit.top-drawOrigin;
+  hoverIndicator.style.transform='translate3d('+hit.left+'px,'+localTop+'px,0)';
   hoverIndicator.hidden=false;
-  // Never call scheduleWindow() here: the expensive emoji canvas is unchanged.
+  // Custom immediate tooltip with the Russian name, independent of the
+  // actual emoji canvas (and without browser-native tooltip latency).
+  hoverTooltip.textContent=hit.entry.name;
+  const tipWidth=Math.min(240,Math.max(112,hit.entry.name.length*7.5+22));
+  const tipLeft=Math.max(6,Math.min(hit.left+(hit.width-tipWidth)/2,surfaceWidth-tipWidth-6));
+  const tipTop=localTop+cellHeight+8+36>surfaceHeight
+    ?Math.max(3,localTop-38)
+    :localTop+cellHeight+8;
+  hoverTooltip.style.left=tipLeft+'px';
+  hoverTooltip.style.top=tipTop+'px';
+  hoverTooltip.hidden=false;
 }
 function cancelRowWork(){}
 function refreshContent(resetScroll=true){
