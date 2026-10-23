@@ -101,6 +101,31 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     };
     assert.deepEqual(getLabels(watermarkLight.oddImage),['an4ous','emoji'],'First row checkerboard incorrect');
     assert.deepEqual(getLabels(watermarkLight.evenImage),['emoji','an4ous'],'Second row checkerboard incorrect');
+
+    // Regression guard: every moving word must stay on its own diagonal lane.
+    // The normal dot-product is invariant during the diagonal animation.
+    const centers=image=>{
+      const svg=decodeURIComponent(image.match(/data:image\/svg\+xml,([^"']+)/)[1]);
+      return [...svg.matchAll(/translate\((\d+) (\d+)\)/g)].map(m=>[Number(m[1]),Number(m[2])]);
+    };
+    const n=[280/Math.hypot(400,280),400/Math.hypot(400,280)];
+    const lanePeriod=400*n[0]; // x tile wrap (same as the 280px y wrap)
+    const laneOffset=([x,y])=>{
+      const offset=(x*n[0]+y*n[1])%lanePeriod;
+      return offset<0?offset+lanePeriod:offset;
+    };
+    const onSameLane=(u,v)=>Math.min(Math.abs(u-v),lanePeriod-Math.abs(u-v))<1;
+    const oddLane=centers(watermarkLight.oddImage).map(p=>laneOffset(p));
+    const evenLane=centers(watermarkLight.evenImage).map(p=>laneOffset(p));
+    assert(onSameLane(oddLane[0],oddLane[1]),'Odd words belong to different diagonal rows, causing collisions');
+    assert(onSameLane(evenLane[0],evenLane[1]),'Even words belong to different diagonal rows, causing collisions');
+    const laneGap=Math.min(Math.abs(oddLane[0]-evenLane[0]),lanePeriod-Math.abs(oddLane[0]-evenLane[0]));
+    assert(laneGap>100,'Opposite-moving rows overlap instead of having a safe gap');
+    const dot=([x,y])=>x*n[0]+y*n[1];
+    assert(Math.abs(dot([-400,280]))<0.1&&Math.abs(dot([400,-280]))<0.1,
+      'Animation moves words across rows rather than along them');
+    console.log('non-overlapping diagonal lanes',{oddLane,evenLane,gap:laneGap});
+
     await page.evaluate(()=>{isDark=true;applyTheme()});
     const watermarkDark=await page.evaluate(()=>({
       oddImage:getComputedStyle(document.body,'::before').backgroundImage,
