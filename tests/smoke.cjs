@@ -96,12 +96,69 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     assert(hoverState.tooltipVisible,'Russian emoji name tooltip was not shown');
     assert.equal(hoverState.tooltipText,hoverState.hoveredName,'Tooltip name mismatch');
     const recent=await page.evaluate(()=>{
-      history=['😂','🌌'];renderRecent();
-      return {labels:[...document.querySelectorAll('#recent-grid button')].map(b=>b.title),count:document.querySelector('#recent-count').textContent};
+      history=['😂','🌌'];
+      renderRecent();
+      const buttons=[...document.querySelectorAll('#recent-grid button')];
+      const b=buttons[0].getBoundingClientRect(),img=buttons[0].querySelector('canvas').getBoundingClientRect();
+      return {
+        labels:buttons.map(x=>x.dataset.label),
+        count:document.querySelector('#recent-count').textContent,
+        centered:Math.abs((b.left+b.width/2)-(img.left+img.width/2))<1
+          &&Math.abs((b.top+b.height/2)-(img.top+img.height/2))<1,
+        iconCanvases:buttons.every(x=>x.querySelector('canvas'))
+      };
     });
     console.log('recent',recent);
     assert.equal(recent.labels.length,2,'Recent emoji strip did not populate');
+    assert(recent.labels.every(Boolean),'Recent entries have no Russian names');
     assert(recent.count.includes('2'),'Recent count not updated');
+    assert(recent.centered&&recent.iconCanvases,'Recent emoji icons are not centered');
+    await page.evaluate(()=>{
+      hideFrames=true;
+      applyFrames();
+    });
+    const frameless=await page.evaluate(()=>{
+      const recent=document.querySelector('.recent-emoji');
+      const style=getComputedStyle(recent);
+      return {background:style.backgroundColor,border:style.borderTopWidth};
+    });
+    console.log('frameless recent',frameless);
+    assert.equal(frameless.background,'rgba(0, 0, 0, 0)','Recent emoji still has a background after disabling frames');
+    assert.equal(frameless.border,'0px','Recent emoji still has a border after disabling frames');
+    await page.evaluate(()=>{
+      hideFrames=false;
+      applyFrames();
+    });
+    // Hovering a recent emoji should locate and highlight its real catalogue item
+    // without changing the search term automatically.
+    await page.locator('#clear').click();
+    await sleep(140);
+    const recentCoords=await page.evaluate(()=>{
+      const b=document.querySelector('#recent-grid button').getBoundingClientRect();
+      return {x:b.left+b.width/2,y:b.top+b.height/2};
+    });
+    await page.mouse.move(recentCoords.x,recentCoords.y);
+    await sleep(230);
+    const located=await page.evaluate(()=>({
+      hoveredName:hoveredItem?.name,
+      recentName:document.querySelector('#recent-grid button').dataset.label,
+      indicatorVisible:!document.querySelector('#emoji-hover-indicator').hidden,
+      tooltipVisible:!document.querySelector('#emoji-hover-tooltip').hidden,
+      scrollTop:document.querySelector('#catalog').scrollTop,
+      recentNative:recentHoverNative
+    }));
+    console.log('recent hover locator',located);
+    assert.equal(located.hoveredName,located.recentName,'Recent hover did not highlight matching catalogue emoji');
+    assert(located.indicatorVisible&&located.tooltipVisible,'Recent hover did not show catalogue indicator and Russian name');
+    assert.equal(located.recentNative,'😂');
+    await page.mouse.move(3,3);
+    await sleep(40);
+    const stopped=await page.evaluate(()=>({
+      recentNative:recentHoverNative,
+      visible:!document.querySelector('#emoji-hover-indicator').hidden
+    }));
+    assert.equal(stopped.recentNative,null,'Recent hover did not clear after pointer left');
+    assert(!stopped.visible,'Recent highlight persisted after leaving');
     await page.locator('#grid-toggle').click();
     await page.locator('#catalog-hex').fill('#123456');
     await page.keyboard.press('Tab');
