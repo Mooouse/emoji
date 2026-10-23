@@ -205,7 +205,7 @@ applyTheme();
 function updateDimensions(){
   const viewportWidth=catalog.clientWidth-(window.innerWidth<680?14:24);
   const minimumWidth=fontSize+15;
-  effectiveColumns=Math.min(columns,Math.max(2,Math.floor((viewportWidth+gap)/(minimumWidth+gap))));
+  effectiveColumns=Math.min(columns,Math.max(1,Math.floor((viewportWidth+gap)/(minimumWidth+gap))));
   cellHeight=Math.max(45,Math.round(fontSize*1.35)+17);
   rowHeight=cellHeight+gap;
   // Vertical density is independent of the user's screen height.
