@@ -181,14 +181,19 @@ html.no-emoji-frames .catalog .emoji:hover,html.dark.no-emoji-frames .catalog .e
 .recent-count{font-size:12px;color:#98a0a9}
 .recent-grid{display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-height:38px}
 .recent-empty{font-size:12px;color:#9aa0a9;padding:10px 0}
-.recent-emoji{display:grid;place-items:center;width:42px;height:42px;font-size:27px;line-height:1;border:1px solid #e9ebed;border-radius:8px;background:#fff;cursor:pointer}
-.recent-emoji:hover{background:#fff0e5;border-color:#ffbf92}
+.recent-emoji{position:relative;display:flex;align-items:center;justify-content:center;flex:0 0 42px;width:42px;height:42px;box-sizing:border-box;padding:0;font-size:27px;line-height:1;border:1px solid var(--emoji-card-border,#e9ebed);border-radius:8px;background:var(--emoji-card-bg,#fff);cursor:pointer;text-align:center;vertical-align:middle;appearance:none;-webkit-appearance:none}
+.recent-icon{display:block;flex:0 0 auto;width:40px;height:40px;max-width:100%;max-height:100%;object-fit:contain;pointer-events:none}
+.recent-emoji:hover,.recent-emoji:focus-visible{background:var(--emoji-card-hover,#fff0e5);border-color:var(--emoji-card-hover-border,#ffbf92)}
 .recent-emoji:focus-visible{outline:2px solid #ee9b67;outline-offset:2px}
+.recent-emoji::after{content:attr(data-label);position:absolute;z-index:9;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%);display:none;min-width:max-content;max-width:240px;white-space:nowrap;background:#25272c;color:#fff;border-radius:7px;padding:7px 10px;font:500 12px/1.3 Arial,sans-serif;box-shadow:0 6px 18px #0004;pointer-events:none}
+.recent-emoji:hover::after,.recent-emoji:focus-visible::after{display:block}
+html.no-emoji-frames .recent-emoji,html.dark.no-emoji-frames .recent-emoji{background:transparent;border-color:transparent;border-width:0;border-radius:0}
+html.no-emoji-frames .recent-emoji:hover,html.dark.no-emoji-frames .recent-emoji:hover{background:transparent;border:0}
 html.dark .recent-panel{background:#1b1b1b;border-color:#343434}
 html.dark .recent-head h2{color:#ececec}
-html.dark .recent-emoji{color:#f5f5f5;background:#252525;border-color:#363636}
-html.dark .recent-emoji:hover{background:#3b2d22;border-color:#a77757}
-@media(max-width:680px){.nav .tab{font-size:12px;height:37px;padding:0 12px}.recent-panel{padding:12px}.recent-emoji{width:38px;height:38px;font-size:25px}}
+html.dark .recent-emoji{background:var(--emoji-card-bg,#252525);border-color:var(--emoji-card-border,#363636)}
+html.dark .recent-emoji:hover{background:var(--emoji-card-hover,#3b2d22);border-color:var(--emoji-card-hover-border,#a77757)}
+@media(max-width:680px){.nav .tab{font-size:12px;height:37px;padding:0 12px}.recent-panel{padding:12px}.recent-emoji{width:38px;height:38px;flex-basis:38px;font-size:25px}.recent-icon{width:36px;height:36px}}
 
 
 /* Scrolling and hover overlays are fixed to the sticky viewport, not moved by JS. */
@@ -362,11 +367,99 @@ function renderRecent(){
     grid.innerHTML='<span class="recent-empty">Скопированные эмодзи появятся здесь.</span>';
     return;
   }
+  // Use the exact same native emoji atlas as the main catalogue. Thumbnails
+  // are optically centered, and no font glyph is rasterized on scroll/hover.
   grid.innerHTML=recent.map(item=>
-    '<button type="button" class="recent-emoji" data-recent-emoji="'+escapeHTML(item.native)+'" title="'+escapeHTML(item.name)+' — копировать" aria-label="Скопировать '+escapeHTML(item.name)+'">'+item.native+'</button>'
+    '<button type="button" class="recent-emoji" data-recent-emoji="'+escapeHTML(item.native)+
+    '" data-label="'+escapeHTML(item.name)+'" aria-label="Скопировать '+escapeHTML(item.name)+'">'+
+    '<canvas class="recent-icon" width="80" height="80" aria-hidden="true"></canvas></button>'
   ).join('');
+  if(spriteAtlas){
+    const tiles=grid.querySelectorAll('[data-recent-emoji]');
+    for(let i=0;i<tiles.length;i++){
+      const entry=recent[i],ctx=tiles[i].querySelector('canvas').getContext('2d');
+      const index=entry.atlasIndex;
+      ctx.drawImage(spriteAtlas,(index%ATLAS_COLS)*ATLAS_TILE,Math.floor(index/ATLAS_COLS)*ATLAS_TILE,
+        ATLAS_TILE,ATLAS_TILE,0,0,ATLAS_TILE,ATLAS_TILE);
+    }
+  }
 }
-el('recent-grid').addEventListener('click',event=>{
+// When a recent emoji is hovered, locate it in the catalogue and visually
+// highlight its actual card without regenerating the main Canvas.
+let recentHoverNative=null;
+function findRecentInModel(native){
+  for(let row=0;row<model.length;row++){
+    const record=model[row];
+    if(record.kind!=='emojis')continue;
+    const column=record.items.findIndex(item=>item.native===native);
+    if(column>=0)return {row,column,entry:record.items[column]};
+  }
+  return null;
+}
+function showRecentInCatalogue(native){
+  if(!model.length||!native)return;
+  const match=findRecentInModel(native);
+  if(!match)return; // Respect an active search filter rather than erasing it.
+  const visibleHeight=Math.min(catalog.clientHeight,surfaceHeight||catalog.clientHeight);
+  const target=positions[match.row];
+  // Move only the scrollable emoji list, not the outer page.
+  if(target<catalog.scrollTop+8||target+cellHeight>catalog.scrollTop+visibleHeight-8){
+    catalog.scrollTop=Math.max(0,target-Math.max(8,Math.round((visibleHeight-cellHeight)/2)));
+  }
+  scheduleWindow();
+  // The pending canvas frame will place the highlight using the new scroll offset.
+  requestAnimationFrame(()=>{
+    if(recentHoverNative!==native)return;
+    showRecentHighlight(match);
+  });
+}
+function showRecentHighlight(match){
+  if(!hoverIndicator||!viewCanvas)return;
+  const pad=window.innerWidth<680?7:12;
+  const width=surfaceWidth||catalog.clientWidth;
+  const cellWidth=Math.max(2,(width-2*pad-(effectiveColumns-1)*gap)/effectiveColumns);
+  const x=pad+match.column*(cellWidth+gap);
+  const y=positions[match.row]-catalog.scrollTop;
+  if(y+cellHeight<0||y>surfaceHeight)return;
+  hoveredItem=match.entry;
+  hoverIndicator.style.width=cellWidth+'px';
+  hoverIndicator.style.height=cellHeight+'px';
+  hoverIndicator.style.transform='translate3d('+x+'px,'+y+'px,0)';
+  hoverIndicator.hidden=false;
+  hoverTooltip.textContent=match.entry.name;
+  const tipWidth=Math.min(240,Math.max(112,match.entry.name.length*7.5+22));
+  hoverTooltip.style.left=Math.max(6,Math.min(x+(cellWidth-tipWidth)/2,width-tipWidth-6))+'px';
+  hoverTooltip.style.top=(y+cellHeight+44>surfaceHeight?Math.max(3,y-38):y+cellHeight+8)+'px';
+  hoverTooltip.hidden=false;
+}
+function startRecentHover(button){
+  const native=button.dataset.recentEmoji;
+  if(recentHoverNative===native)return;
+  recentHoverNative=native;
+  showRecentInCatalogue(native);
+}
+function stopRecentHover(){
+  recentHoverNative=null;
+  hideHover();
+}
+const recentGrid=el('recent-grid');
+recentGrid.addEventListener('pointerover',event=>{
+  const button=event.target.closest('[data-recent-emoji]');
+  if(button&&recentGrid.contains(button))startRecentHover(button);
+});
+recentGrid.addEventListener('pointerout',event=>{
+  const button=event.target.closest('[data-recent-emoji]');
+  if(button&&!button.contains(event.relatedTarget))stopRecentHover();
+});
+recentGrid.addEventListener('focusin',event=>{
+  const button=event.target.closest('[data-recent-emoji]');
+  if(button)startRecentHover(button);
+});
+recentGrid.addEventListener('focusout',event=>{
+  const button=event.target.closest('[data-recent-emoji]');
+  if(button&&!button.contains(event.relatedTarget))stopRecentHover();
+});
+recentGrid.addEventListener('click',event=>{
   const button=event.target.closest('[data-recent-emoji]');
   if(button)copy(button.dataset.recentEmoji);
 });
