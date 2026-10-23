@@ -5,24 +5,233 @@
 <title>Emoji — список эмодзи для копирования</title>
 <style>
 :root{font-family:Arial,"Segoe UI Emoji","Apple Color Emoji",sans-serif;color:#24282e;background:#fff;font-synthesis:none}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0}button,input{font:inherit}button{cursor:pointer}.top{height:58px;border-bottom:1px solid #e7e9ed;position:sticky;top:0;background:#fffc;backdrop-filter:blur(14px);z-index:10}.topin{max-width:1180px;padding:0 24px;margin:auto;display:flex;align-items:center;justify-content:space-between;height:100%;gap:18px}.logo{font-size:22px;font-weight:800;letter-spacing:-.9px;color:#252932;text-decoration:none}.logo span{color:#fc9955}.topright{font-size:13px;color:#838993}.shell{max-width:1180px;margin:auto;padding:29px 24px 60px}.hero h1{margin:0 0 9px;font-size:30px;letter-spacing:-.9px}.hero p{font-size:14px;color:#747b85;line-height:1.65;margin:0 0 20px}.searchline{display:flex;gap:12px}.searchbox{display:flex;align-items:center;gap:10px;border:1px solid #e1e4e8;border-radius:10px;background:#fafbfc;padding:0 16px;flex:1;transition:border .2s}.searchbox:focus-within{border-color:#f4a16a;box-shadow:0 0 0 3px #ffe9da}.searchbox svg{color:#9098a3;flex-shrink:0}.searchbox input{background:transparent;border:0;outline:0;width:100%;height:48px;font-size:15px;color:inherit}.searchbox input::placeholder{color:#a3a9b0}.clear{border:0;background:#f3f4f6;border-radius:9px;padding:0 15px;color:#6f7681;display:none}.clear.visible{display:block}.nav{display:flex;align-items:center;gap:8px;overflow:auto;padding:19px 0 15px;scrollbar-width:thin}.tab{border:1px solid #e8eaed;background:white;white-space:nowrap;border-radius:9px;min-width:45px;height:42px;font-size:22px;transition:background .16s,border .16s}.tab:hover,.tab.active{background:#fff2e8;border-color:#ffbf92}.count{font-size:12px;color:#969da7;margin:0 0 20px}.group{scroll-margin-top:100px;margin-bottom:24px}.group h2{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;letter-spacing:-.2px;margin:22px 0 15px}.group h2 .section-icon{font-size:22px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(61px,1fr));gap:7px}.emoji{height:63px;border-radius:9px;background:#f8f9fa;border:1px solid #f0f1f3;display:grid;place-items:center;font-size:31px;line-height:1;position:relative;transition:transform .1s,background .1s,border-color .1s}.emoji:hover{background:#fff0e5;border-color:#ffbe91;transform:translateY(-2px)}.emoji:focus-visible{outline:2px solid #f39458;outline-offset:2px}.emoji:active{transform:scale(.94)}.empty{padding:60px 20px;text-align:center;color:#7c8490}.empty strong{display:block;color:#30343b;margin:12px 0}.toast{position:fixed;bottom:25px;left:50%;transform:translate(-50%,20px);background:#2a2d33;color:white;padding:12px 18px;border-radius:12px;box-shadow:0 12px 35px #0002;opacity:0;pointer-events:none;transition:.2s;z-index:50;font-size:14px}.toast.show{opacity:1;transform:translate(-50%,0)}.footer{border-top:1px solid #eff0f2;padding:25px 0;margin-top:26px;font-size:12px;text-align:center;color:#9aa0a9}.more{border:1px solid #e7e9ed;background:white;border-radius:8px;padding:8px 14px;font-size:13px;color:#59616b;margin-top:14px}.more:hover{background:#f8f9fa}.hidden{display:none!important}.status{color:#999;font-size:12px}.settings{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-left:auto}.theme{border:1px solid #eee;border-radius:8px;background:transparent;padding:9px}.copyhint{font-size:12px;color:#aaa;margin-left:auto;font-weight:400}@media(max-width:700px){.shell{padding:22px 14px}.topin{padding:0 14px}.hero h1{font-size:24px}.grid{grid-template-columns:repeat(auto-fill,minmax(49px,1fr));gap:5px}.emoji{height:53px;font-size:27px}.tab{min-width:42px;height:40px}.topright,.copyhint{display:none}.group h2{font-size:16px}}@media(min-width:1500px){.shell,.topin{max-width:1300px}.grid{grid-template-columns:repeat(auto-fill,minmax(65px,1fr))}}body.dark{background:#141414;color:#f1f1f1}body.dark .top{background:#161616ee;border-color:#333}body.dark .logo{color:#fff}body.dark .searchbox,body.dark .emoji{background:#222;border-color:#303030}body.dark .tab,body.dark .more{background:#202020;border-color:#333;color:#eee}body.dark .tab:hover,body.dark .tab.active,body.dark .emoji:hover{background:#3b2c23;border-color:#a76c48}body.dark .searchbox input{color:#fff}body.dark .footer{border-color:#333}body.dark .theme{border-color:#333;color:#eee}body.dark .clear{background:#303030;color:#eee}
+
+/* Fast list rendering and a true neutral-black dark theme. */
+.theme{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-size:13px;font-weight:600;white-space:nowrap;padding:10px 14px;background:#fff;border-color:#e2e4e8}
+.theme:hover{background:#f7f7f8}.theme:focus-visible,.tab:focus-visible,.more:focus-visible{outline:2px solid #ef965a;outline-offset:2px}
+.more{display:block;margin:14px auto 4px;padding:11px 18px;min-height:40px}
+.group{content-visibility:auto;contain-intrinsic-size:auto 350px}
+html.dark{color-scheme:dark;background:#0e0e0e}
+html.dark body{background:#0e0e0e;color:#f2f2f2}
+html.dark .top{background:#111111ed;border-color:#272727}
+html.dark .logo{color:#fff}
+html.dark .searchbox{background:#1b1b1b;border-color:#363636}
+html.dark .searchbox:focus-within{border-color:#c68455;box-shadow:0 0 0 3px #63381a5a}
+html.dark .searchbox input{color:#f5f5f5}
+html.dark .searchbox input::placeholder{color:#8f8f8f}
+html.dark .hero p,html.dark .count,html.dark .copyhint,html.dark .topright{color:#a0a0a0}
+html.dark .emoji{background:#1d1d1d;border-color:#2b2b2b}
+html.dark .emoji:hover{background:#33271e;border-color:#ab7b55}
+html.dark .tab,html.dark .more,html.dark .theme{background:#1e1e1e;border-color:#343434;color:#ebebeb}
+html.dark .tab:hover,html.dark .tab.active,html.dark .more:hover,html.dark .theme:hover{background:#33251c;border-color:#8f6043}
+html.dark .clear{background:#292929;color:#e4e4e4}
+html.dark .footer{border-color:#2d2d2d}
+html.dark .empty strong{color:#fafafa}
+@media(max-width:700px){.theme{padding:9px 10px}.theme span{display:none}}
+
 </style>
 </head><body>
 <header class="top"><div class="topin"><a href="./" class="logo">emoji<span>.</span></a><div class="settings"><span class="topright">Копируй любимые эмодзи одним нажатием</span><button class="theme" id="theme" aria-label="Переключить тему" title="Переключить тему">🌙</button></div></div></header>
 <main class="shell"><div class="hero"><h1>Список Emoji 😀</h1><p>Нажми на любой эмодзи, чтобы скопировать его. Выбирай категории или найди нужный символ через поиск.</p><div class="searchline"><label class="searchbox"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="search" type="search" placeholder="Мгновенный поиск эмодзи..." autocomplete="off" aria-label="Поиск эмодзи"></label><button id="clear" class="clear">Очистить</button></div></div>
 <nav id="nav" class="nav" aria-label="Категории"></nav><p id="count" class="count">Загрузка эмодзи...</p><div id="content"></div><footer class="footer">Emoji — каталог эмодзи · Нажмите на значок, чтобы скопировать · <button id="reset" class="more">Очистить историю</button></footer></main><div id="toast" class="toast" role="status" aria-live="polite">Скопировано!</div>
 <script>
-const groups=[{id:'recent',icon:'🕓',name:'Недавно использованные'},{id:'people',icon:'😀',name:'Смайлики и люди'},{id:'nature',icon:'🐶',name:'Животные и природа'},{id:'foods',icon:'🥭',name:'Еда и напитки'},{id:'activity',icon:'⚽',name:'Действия'},{id:'places',icon:'🏖️',name:'Путешествия и места'},{id:'objects',icon:'🕯️',name:'Объекты'},{id:'symbols',icon:'⭕',name:'Символы'},{id:'flags',icon:'🚩',name:'Флаги'}];
+
+const groups=[
+{id:'recent',icon:'🕓',name:'Недавно использованные'},
+{id:'people',icon:'😀',name:'Смайлики и люди'},
+{id:'nature',icon:'🐶',name:'Животные и природа'},
+{id:'foods',icon:'🥭',name:'Еда и напитки'},
+{id:'activity',icon:'⚽',name:'Действия'},
+{id:'places',icon:'🏖️',name:'Путешествия и места'},
+{id:'objects',icon:'🕯️',name:'Объекты'},
+{id:'symbols',icon:'⭕',name:'Символы'},
+{id:'flags',icon:'🚩',name:'Флаги'}];
 const ru={smile:'улыбка',face:'лицо',heart:'сердце',love:'любовь',cat:'кот',dog:'собака',flag:'флаг',food:'еда',sun:'солнце',moon:'луна',star:'звезда',flower:'цветок',fire:'огонь',water:'вода',car:'машина',house:'дом',hand:'рука',thumbs:'палец',eyes:'глаза',cry:'плач',laugh:'смех',sad:'грусть',happy:'счастье',kiss:'поцелуй',tree:'дерево',bird:'птица',money:'деньги',gift:'подарок',book:'книга',phone:'телефон',music:'музыка',coffee:'кофе',pizza:'пицца',ball:'мяч',check:'галочка',warning:'внимание',clock:'часы',family:'семья',person:'человек',man:'мужчина',woman:'женщина',baby:'ребенок'};
-const q=id=>document.getElementById(id),store='emoji_history_v1';
-let entries=[],selected='all',term='',history=[];try{history=JSON.parse(localStorage.getItem(store)||'[]')}catch(e){}
-let isDark=localStorage.getItem('emoji_theme')==='dark';document.body.classList.toggle('dark',isDark);q('theme').textContent=isDark?'☀️':'🌙';q('theme').onclick=()=>{isDark=!isDark;localStorage.setItem('emoji_theme',isDark?'dark':'light');document.body.classList.toggle('dark',isDark);q('theme').textContent=isDark?'☀️':'🌙'};
+const q=id=>document.getElementById(id);
+const store='emoji_history_v1';
+let entries=[],byCategory=new Map(),byNative=new Map(),selected='all',term='',history=[];
+let timer=null,toastTimeout=null;
+const limits=new Map();
+const PAGE=100,SEARCH_PAGE=45;
+try{const saved=JSON.parse(localStorage.getItem(store)||'[]');history=Array.isArray(saved)?saved.slice(0,35):[]}catch(e){history=[]}
+const themeButton=q('theme');
+let isDark=localStorage.getItem('emoji_theme')==='dark';
+function applyTheme(){
+  document.documentElement.classList.toggle('dark',isDark);
+  document.body.classList.toggle('dark',isDark);
+  themeButton.innerHTML=isDark?'☀️ <span>Светлая тема</span>':'🌙 <span>Тёмная тема</span>';
+  themeButton.title=isDark?'Включить светлую тему':'Включить тёмную тему';
+  themeButton.setAttribute('aria-label',themeButton.title);
+  themeButton.setAttribute('aria-pressed',String(isDark));
+  document.querySelector('meta[name="theme-color"]').content=isDark?'#0e0e0e':'#ffffff';
+}
+applyTheme();
+themeButton.addEventListener('click',()=>{
+  isDark=!isDark;
+  localStorage.setItem('emoji_theme',isDark?'dark':'light');
+  applyTheme();
+});
 function safe(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function nav(){q('nav').innerHTML=groups.map(g=>'<button type="button" class="tab '+(selected===g.id?'active':'')+'" data-tab="'+g.id+'" title="'+g.name+'" aria-label="'+g.name+'">'+g.icon+'</button>').join('');q('nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{term='';q('search').value='';q('clear').classList.remove('visible');selected=selected===b.dataset.tab?'all':b.dataset.tab;render();if(selected!=='all')document.querySelector('.group')?.scrollIntoView({behavior:'smooth',block:'start'});});}
-function matches(item){if(!term)return true;return item.search.includes(term)}
-function itemHtml(e){return '<button type="button" class="emoji" title="'+safe(e.name)+' — нажмите, чтобы скопировать" aria-label="Скопировать '+safe(e.name)+'" data-emoji="'+safe(e.native)+'">'+e.native+'</button>'}
-function render(){nav();let shown=0;const fragment=[];for(const g of groups){if(selected!=='all'&&selected!==g.id)continue;let rows=g.id==='recent'?history.map(s=>entries.find(e=>e.native===s)).filter(Boolean):entries.filter(e=>e.cat===g.id);rows=rows.filter(matches);if(!rows.length)continue;shown+=rows.length;fragment.push('<section class="group" id="'+g.id+'"><h2><span class="section-icon">'+g.icon+'</span>'+g.name+'<span class="copyhint">'+rows.length+' символов</span></h2><div class="grid">'+rows.map(itemHtml).join('')+'</div></section>')}q('content').innerHTML=fragment.join('')||'<div class="empty"><div style="font-size:48px">🔎</div><strong>Ничего не найдено</strong>Попробуй другое слово или выбери другую категорию.</div>';q('count').textContent=term?'Найдено: '+shown:entries.length+' эмодзи · Все символы можно копировать по нажатию';}
-let toastTimeout;function notice(str){q('toast').textContent=str;q('toast').classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>q('toast').classList.remove('show'),1700)}
-async function copy(str){try{await navigator.clipboard.writeText(str)}catch(e){const el=document.createElement('textarea');el.value=str;el.style.position='fixed';el.style.opacity='0';document.body.appendChild(el);el.select();try{document.execCommand('copy')}finally{el.remove()}}history=[str,...history.filter(x=>x!==str)].slice(0,35);localStorage.setItem(store,JSON.stringify(history));notice(str+' Скопировано!');if(!term&&(selected==='all'||selected==='recent'))render()}
-q('content').addEventListener('click',e=>{const b=e.target.closest('[data-emoji]');if(b)copy(b.dataset.emoji)});q('search').addEventListener('input',e=>{term=e.target.value.trim().toLowerCase().replaceAll('ё','е');selected='all';q('clear').classList.toggle('visible',!!term);render()});q('clear').onclick=()=>{term='';q('search').value='';q('clear').classList.remove('visible');render();q('search').focus()};q('reset').onclick=()=>{history=[];localStorage.removeItem(store);render();notice('История очищена')};
-fetch('./emoji-data.json').then(r=>{if(!r.ok)throw Error(r.status);return r.json()}).then(data=>{entries=data.map(([cat,native,name,keys])=>{let search=[native,name,keys||''];for(const [en,word]of Object.entries(ru))if((name+' '+(keys||'')).toLowerCase().includes(en))search.push(word);return {cat,native,name,search:search.join(' ').toLowerCase().replaceAll('ё','е')}});render()}).catch(()=>{q('count').textContent='Не удалось загрузить каталог';q('content').innerHTML='<p>Обновите страницу, чтобы повторить попытку.</p>'});
+function nav(){
+  q('nav').innerHTML=groups.map(g=>'<button type="button" class="tab '+(selected===g.id?'active':'')+'" data-tab="'+g.id+'" aria-pressed="'+(selected===g.id)+'" title="'+g.name+'" aria-label="'+g.name+'">'+g.icon+'</button>').join('');
+}
+function groupItems(g){
+  return g.id==='recent'?history.map(s=>byNative.get(s)).filter(Boolean):(byCategory.get(g.id)||[]);
+}
+function matches(item){return !term||item.search.includes(term)}
+function itemHtml(e){
+  return '<button type="button" class="emoji" title="'+safe(e.name)+' — нажмите, чтобы скопировать" aria-label="Скопировать '+safe(e.name)+'" data-emoji="'+safe(e.native)+'">'+e.native+'</button>';
+}
+function sectionHtml(g){
+  if(selected!=='all'&&selected!==g.id)return '';
+  const source=groupItems(g);
+  if(!source.length)return '';
+  const rows=term?source.filter(matches):source;
+  if(!rows.length)return '';
+  const max=limits.get(g.id)||((term)?SEARCH_PAGE:(selected==='all'?PAGE:PAGE*2));
+  const slice=rows.slice(0,max);
+  return '<section class="group" id="'+g.id+'"><h2><span class="section-icon">'+g.icon+'</span>'+g.name+
+  '<span class="copyhint">'+rows.length+' символов</span></h2><div class="grid">'+slice.map(itemHtml).join('')+'</div>'+
+  (rows.length>slice.length?'<button type="button" class="more" data-more="'+g.id+'">Показать ещё · '+(rows.length-slice.length)+' осталось</button>':'')+'</section>';
+}
+const content=q('content');
+const loadObserver='IntersectionObserver' in window?
+  new IntersectionObserver(changes=>{
+    for(const change of changes){
+      if(change.isIntersecting){
+        loadObserver.unobserve(change.target);
+        const id=change.target.dataset.more;
+        if(id)showMore(id);
+      }
+    }
+  },{rootMargin:'180px'}):null;
+function observeMore(){
+  if(!loadObserver)return;
+  loadObserver.disconnect();
+  content.querySelectorAll('[data-more]').forEach(b=>loadObserver.observe(b));
+}
+function countResults(){
+  let count=0;
+  for(const g of groups){
+    if(g.id==='recent'||(selected!=='all'&&selected!==g.id))continue;
+    count+=term?groupItems(g).filter(matches).length:groupItems(g).length;
+  }
+  return count;
+}
+function render(){
+  nav();
+  const sections=groups.map(sectionHtml).filter(Boolean);
+  content.innerHTML=sections.join('')||'<div class="empty"><div style="font-size:48px">🔎</div><strong>Ничего не найдено</strong>Попробуй другое слово или выбери другую категорию.</div>';
+  q('count').textContent=term?'Найдено: '+countResults():entries.length+' эмодзи · Нажмите на любой, чтобы скопировать';
+  observeMore();
+}
+function showMore(id){
+  const group=groups.find(g=>g.id===id);
+  const old=q(id);
+  if(!group||!old)return;
+  const current=limits.get(id)||((term)?SEARCH_PAGE:(selected==='all'?PAGE:PAGE*2));
+  limits.set(id,current+PAGE);
+  old.outerHTML=sectionHtml(group);
+  observeMore();
+}
+function updateRecent(){
+  if(term||(selected!=='all'&&selected!=='recent'))return;
+  const existing=q('recent');
+  const html=sectionHtml(groups[0]);
+  if(existing){if(html)existing.outerHTML=html;else existing.remove()}
+  else if(html)content.insertAdjacentHTML('afterbegin',html);
+  observeMore();
+}
+function notice(str){
+  q('toast').textContent=str;
+  q('toast').classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout=setTimeout(()=>q('toast').classList.remove('show'),1700);
+}
+async function copy(str){
+  let ok=false;
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(str);
+      ok=true;
+    }
+  }catch(e){}
+  if(!ok){
+    const el=document.createElement('textarea');
+    el.value=str;
+    el.style.cssText='position:fixed;opacity:0;pointer-events:none';
+    document.body.appendChild(el);
+    el.select();
+    try{ok=document.execCommand('copy')}catch(e){}
+    el.remove();
+  }
+  if(!ok){notice('Не удалось скопировать. Проверьте разрешения браузера.');return}
+  history=[str,...history.filter(x=>x!==str)].slice(0,35);
+  try{localStorage.setItem(store,JSON.stringify(history))}catch(e){}
+  notice(str+' Скопировано!');
+  // Only the small recent section changes; never rebuild the 1870-emoji grid.
+  updateRecent();
+}
+content.addEventListener('click',e=>{
+  const copyButton=e.target.closest('[data-emoji]');
+  if(copyButton){copy(copyButton.dataset.emoji);return}
+  const moreButton=e.target.closest('[data-more]');
+  if(moreButton)showMore(moreButton.dataset.more);
+});
+q('nav').addEventListener('click',e=>{
+  const button=e.target.closest('[data-tab]');
+  if(!button)return;
+  clearTimeout(timer);
+  term='';
+  q('search').value='';
+  q('clear').classList.remove('visible');
+  selected=selected===button.dataset.tab?'all':button.dataset.tab;
+  limits.clear();
+  render();
+  if(selected!=='all')q(selected)?.scrollIntoView({behavior:'smooth',block:'start'});
+});
+q('search').addEventListener('input',e=>{
+  // The input itself stays responsive: never create a large DOM tree inside this event.
+  term=e.target.value.trim().toLowerCase().replaceAll('ё','е');
+  if(selected!=='all'){selected='all';nav()}
+  q('clear').classList.toggle('visible',!!term);
+  limits.clear();
+  clearTimeout(timer);
+  timer=setTimeout(render,110);
+});
+q('clear').addEventListener('click',()=>{
+  clearTimeout(timer);
+  term='';selected='all';limits.clear();
+  q('search').value='';
+  q('clear').classList.remove('visible');
+  render();
+  q('search').focus();
+});
+q('reset').addEventListener('click',()=>{
+  history=[];
+  localStorage.removeItem(store);
+  render();
+  notice('История очищена');
+});
+fetch('./emoji-data.json').then(r=>{
+  if(!r.ok)throw Error(r.status);
+  return r.json();
+}).then(data=>{
+  entries=data.map(([cat,native,name,keys])=>{
+    const terms=[native,name,keys||''];
+    for(const [en,word] of Object.entries(ru))
+      if((name+' '+(keys||'')).toLowerCase().includes(en))terms.push(word);
+    return {cat,native,name,search:terms.join(' ').toLowerCase().replaceAll('ё','е')};
+  });
+  for(const g of groups)byCategory.set(g.id,[]);
+  for(const entry of entries){
+    byCategory.get(entry.cat)?.push(entry);
+    byNative.set(entry.native,entry);
+  }
+  render();
+}).catch(()=>{
+  q('count').textContent='Не удалось загрузить каталог';
+  content.innerHTML='<p>Обновите страницу, чтобы повторить попытку.</p>';
+});
+
 </script></body></html>
