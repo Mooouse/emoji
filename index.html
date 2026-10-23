@@ -215,34 +215,42 @@ html.dark .recent-emoji:hover{background:var(--emoji-card-hover,#3b2d22);border-
 
 
 
-/* Alternating an4ous / emoji checkerboard. Each row drifts in the opposite
-   direction using compositor-only transforms; no per-frame JS or layout. */
+/* Alternating an4ous / emoji checkerboard. The motion vector follows the
+   words' -35° baseline: 400px horizontal, 280px vertical (34.99°).
+   Exactly one full tile in each axis ensures perfectly seamless looping. */
 body{background:#fff}
 html.dark body{background:#0e0e0e}
 .shell{position:relative;z-index:1}
 body::before,body::after{
   content:"";
   position:fixed;
-  top:0;bottom:0;left:-360px;right:-360px;
+  /* Extra tile coverage on all sides prevents blank strips at motion bounds. */
+  top:-280px;bottom:-280px;left:-400px;right:-400px;
   z-index:0;
   pointer-events:none;
   background-repeat:repeat;
-  background-size:360px 280px;
+  background-size:400px 280px;
   background-position:center top;
   will-change:transform;
 }
 body::before{
-  background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22360%22%20height%3D%22280%22%20viewBox%3D%220%200%20360%20280%22%3E%3Cg%20fill%3D%22%23000000%22%20fill-opacity%3D%220.052%22%20font-family%3D%22Arial%2CHelvetica%2Csans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%20letter-spacing%3D%221%22%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(90%2070)%20rotate(-35)%22%3Ean4ous%3C%2Ftext%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(270%2070)%20rotate(-35)%22%3Eemoji%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+  background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22280%22%20viewBox%3D%220%200%20400%20280%22%3E%3Cg%20fill%3D%22%23000000%22%20fill-opacity%3D%220.052%22%20font-family%3D%22Arial%2CHelvetica%2Csans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%20letter-spacing%3D%221%22%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(100%2070)%20rotate(-35)%22%3Ean4ous%3C%2Ftext%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(300%2070)%20rotate(-35)%22%3Eemoji%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E");
   animation:an4ous-drift-left 140s linear infinite;
 }
 body::after{
-  background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22360%22%20height%3D%22280%22%20viewBox%3D%220%200%20360%20280%22%3E%3Cg%20fill%3D%22%23000000%22%20fill-opacity%3D%220.052%22%20font-family%3D%22Arial%2CHelvetica%2Csans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%20letter-spacing%3D%221%22%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(90%20210)%20rotate(-35)%22%3Eemoji%3C%2Ftext%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(270%20210)%20rotate(-35)%22%3Ean4ous%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+  background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22280%22%20viewBox%3D%220%200%20400%20280%22%3E%3Cg%20fill%3D%22%23000000%22%20fill-opacity%3D%220.052%22%20font-family%3D%22Arial%2CHelvetica%2Csans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%20letter-spacing%3D%221%22%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(100%20210)%20rotate(-35)%22%3Eemoji%3C%2Ftext%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(300%20210)%20rotate(-35)%22%3Ean4ous%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E");
   animation:an4ous-drift-right 140s linear infinite;
 }
-html.dark body::before{background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22360%22%20height%3D%22280%22%20viewBox%3D%220%200%20360%20280%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.055%22%20font-family%3D%22Arial%2CHelvetica%2Csans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%20letter-spacing%3D%221%22%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(90%2070)%20rotate(-35)%22%3Ean4ous%3C%2Ftext%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(270%2070)%20rotate(-35)%22%3Eemoji%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E")}
-html.dark body::after{background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22360%22%20height%3D%22280%22%20viewBox%3D%220%200%20360%20280%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.055%22%20font-family%3D%22Arial%2CHelvetica%2Csans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%20letter-spacing%3D%221%22%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(90%20210)%20rotate(-35)%22%3Eemoji%3C%2Ftext%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(270%20210)%20rotate(-35)%22%3Ean4ous%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E")}
-@keyframes an4ous-drift-left{from{transform:translate3d(0,0,0)}to{transform:translate3d(-360px,0,0)}}
-@keyframes an4ous-drift-right{from{transform:translate3d(0,0,0)}to{transform:translate3d(360px,0,0)}}
+html.dark body::before{background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22280%22%20viewBox%3D%220%200%20400%20280%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.055%22%20font-family%3D%22Arial%2CHelvetica%2Csans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%20letter-spacing%3D%221%22%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(100%2070)%20rotate(-35)%22%3Ean4ous%3C%2Ftext%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(300%2070)%20rotate(-35)%22%3Eemoji%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E")}
+html.dark body::after{background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22280%22%20viewBox%3D%220%200%20400%20280%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.055%22%20font-family%3D%22Arial%2CHelvetica%2Csans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%20letter-spacing%3D%221%22%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(100%20210)%20rotate(-35)%22%3Eemoji%3C%2Ftext%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(300%20210)%20rotate(-35)%22%3Ean4ous%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E")}
+@keyframes an4ous-drift-left{
+  from{transform:translate3d(0,0,0)}
+  to{transform:translate3d(-400px,280px,0)}
+}
+@keyframes an4ous-drift-right{
+  from{transform:translate3d(0,0,0)}
+  to{transform:translate3d(400px,-280px,0)}
+}
 @media(prefers-reduced-motion:reduce){body::before,body::after{animation:none;will-change:auto}}
 
 </style></head>
