@@ -176,7 +176,7 @@ function loadNumber(key,fallback,min,max){let v;try{v=Number(localStorage.getIte
 let columns=loadNumber('emoji_columns',16,1,80),visibleRows=loadNumber('emoji_visible_rows',9,1,80),fontSize=loadNumber('emoji_font_size',33,12,96);
 let effectiveColumns=columns,cellHeight=62,rowHeight=69,gap=7;
 let entries=[],categoryData=new Map(),nativeData=new Map(),history=[],term='',model=[],positions=[0],activeNodes=new Map();
-let searchTimer=0,toastTimer=0,scrollFrame=0,resizeFrame=0,workFrame=0,workVersion=0,pendingRows=[];
+let searchTimer=0,toastTimer=0,resizeFrame=0;
 try{const h=JSON.parse(localStorage.getItem(historyKey)||'[]');history=Array.isArray(h)?h.slice(0,24):[]}catch(e){}
 const sliders=[
   {id:'columns',key:'emoji_columns',min:1,max:80,value:()=>columns,set:n=>columns=n},
@@ -336,79 +336,19 @@ function createRow(r,index){
   return node;
 }
 
+
 /*
- * Stable lazy rows:
- * - The entire catalogue has real scroll height immediately.
- * - IntersectionObserver preloads emoji rows before they enter view.
- * - Once a row is created, it is NOT removed/recreated on scroll.
- * - Normal scrolling has no emoji DOM writes, avoiding font-rendering churn.
+ * Scroll performance: emoji button nodes are created only once per data
+ * change, never in a scrolling callback. CSS content-visibility skips layout
+ * and painting for offscreen emoji rows.
  */
-let rowObserver;
-let hydrationQueue=[],queuedNodes=new Set(),relevantRows=new Set(),hydrateFrame=0,hydrationGeneration=0;
-function cancelRowWork(){
-  hydrationGeneration++;
-  hydrationQueue.length=0;
-  queuedNodes.clear();
-  relevantRows.clear();
-  if(hydrateFrame){cancelAnimationFrame(hydrateFrame);hydrateFrame=0}
-}
-function enqueueRow(node){
-  if(node.dataset.ready==='yes'||queuedNodes.has(node))return;
-  queuedNodes.add(node);
-  hydrationQueue.push({node,index:Number(node.dataset.index),generation:hydrationGeneration});
-  if(!hydrateFrame)hydrateFrame=requestAnimationFrame(hydrateRows);
-}
-function hydrateRows(){
-  hydrateFrame=0;
-  const generation=hydrationGeneration;
-  // Prioritize nearby rows if someone drags the scrollbar a long distance.
-  const current=catalog.scrollTop+Math.min(catalog.clientHeight,window.innerHeight)/2;
-  hydrationQueue.sort((a,b)=>Math.abs(positions[a.index]-current)-Math.abs(positions[b.index]-current));
-  const began=performance.now();
-  let done=0;
-  while(hydrationQueue.length&&done<3&&(done===0||performance.now()-began<5)){
-    const item=hydrationQueue.shift();
-    queuedNodes.delete(item.node);
-    if(item.generation!==generation||!item.node.isConnected||!relevantRows.has(item.node)||item.node.dataset.ready==='yes')continue;
-    const row=model[item.index];
-    if(!row)continue;
-    if(row.kind==='header'){
-      item.node.innerHTML='<span class="section-icon">'+row.icon+'</span><span>'+escapeHTML(row.label)+'</span><span class="muted">'+row.count+' эмодзи</span>';
-    }else{
-      item.node.innerHTML=row.items.map(e=>'<button type="button" class="emoji" data-emoji="'+escapeHTML(e.native)+'" title="'+escapeHTML(e.name)+' — копировать" aria-label="Скопировать '+escapeHTML(e.name)+'">'+e.native+'</button>').join('');
-    }
-    item.node.dataset.ready='yes';
-    rowObserver.unobserve(item.node);
-    done++;
-  }
-  if(hydrationQueue.length)hydrateFrame=requestAnimationFrame(hydrateRows);
-}
-rowObserver=new IntersectionObserver(records=>{
-  for(const record of records){
-    if(record.isIntersecting){relevantRows.add(record.target);enqueueRow(record.target)}
-    else relevantRows.delete(record.target);
-  }
-},{root:null,rootMargin:'900px 0px 900px 0px',scrollMargin:'650px 0px 650px 0px',threshold:0});
-function createRowShell(row,index){
-  const node=document.createElement('div');
-  node.className='virtual-row '+(row.kind==='header'?'heading':'emoji-line');
-  node.style.top=positions[index]+'px';
-  node.style.height=(row.kind==='header'?48:cellHeight)+'px';
-  node.dataset.index=index;
-  return node;
-}
+function cancelRowWork(){}
+function scheduleWindow(){}
 function rebuildShells(){
-  rowObserver.disconnect();
-  if(!model.length)return; // rebuildRows already displays the no-results message.
+  if(!model.length)return;
   const fragment=document.createDocumentFragment();
-  const rows=[];
-  for(let i=0;i<model.length;i++){
-    const node=createRowShell(model[i],i);
-    fragment.appendChild(node);
-    rows.push(node);
-  }
+  for(let i=0;i<model.length;i++)fragment.appendChild(createRow(model[i],i));
   layer.replaceChildren(fragment);
-  for(const row of rows)rowObserver.observe(row);
 }
 let scrollNavTimer=0;
 catalog.addEventListener('scroll',()=>{
@@ -420,12 +360,9 @@ catalog.addEventListener('scroll',()=>{
       if(model[i].kind==='header'){group=model[i].id;break}
     }
     updateActiveTab(group);
-  },150);
+  },180);
 },{passive:true});
-function scheduleWindow(){/* Rows are hydrated via IntersectionObserver; no scroll rerender. */}
 function refreshContent(resetScroll=true){
-  cancelRowWork();
-  rowObserver.disconnect();
   if(resetScroll)catalog.scrollTop=0;
   rebuildRows();
   rebuildShells();
@@ -468,7 +405,6 @@ search.addEventListener('input',()=>{
   clearTimeout(searchTimer);
   // Give keyboard input priority: abort expensive emoji-row creation immediately.
   cancelRowWork();
-  rowObserver.disconnect();
   searchTimer=setTimeout(updateSearch,165);
 });
 el('clear').addEventListener('click',()=>{
