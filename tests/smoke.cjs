@@ -30,6 +30,18 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
       canvas:!!document.querySelector('#emoji-viewport')
     }));
     console.log('initial',state);
+    const ui=await page.evaluate(()=>({
+      tabNames:[...document.querySelectorAll('#nav .tab')].map(t=>t.textContent.trim()),
+      recentBelowTabs:document.querySelector('#nav').nextElementSibling?.id==='recent-section',
+      recentLabel:document.querySelector('#recent-section h2')?.textContent,
+      viewportPosition:getComputedStyle(document.querySelector('#emoji-sticky-surface')).position,
+      canvasTop:document.querySelector('#emoji-viewport').getBoundingClientRect().top
+    }));
+    console.log('navigation',ui);
+    assert(ui.tabNames.includes('Смайлики и люди')&&ui.tabNames.includes('Все эмодзи'));
+    assert(ui.tabNames.every(x=>!/[😀🐶🥭⚽🏖🕯⭕🚩]/u.test(x)),'Category navigation still uses emoji icons');
+    assert(ui.recentBelowTabs&&ui.recentLabel==='Недавно использованные','Recent section is not below categories');
+    assert.equal(ui.viewportPosition,'sticky','Emoji canvas must use native sticky scrolling');
     assert(state.atlas,'Emoji texture atlas failed to generate');
     assert(state.domEmojiButtons===0,'Emoji DOM glyphs still exist');
     assert(state.fullHeight>state.viewport,'Not all emojis are reachable by scrolling');
@@ -44,11 +56,13 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     state=await page.evaluate(()=>({
       scrollTop:document.querySelector('#catalog').scrollTop,
       frame:lastDrawMetrics,
-      domButtons:document.querySelectorAll('.emoji').length
+      domButtons:document.querySelectorAll('.emoji').length,
+      canvasTop:document.querySelector('#emoji-viewport').getBoundingClientRect().top
     }));
     console.log('after fast scroll',state);
     assert(state.frame.icons>0,'Icons did not draw at the end of scrolling');
     assert.equal(state.domButtons,0,'Scrolling reconstructed emoji buttons');
+    assert(Math.abs(state.canvasTop-ui.canvasTop)<2,'Canvas jumps instead of staying fixed during native scroll');
     await page.locator('#search').fill('сердце');
     await sleep(280);
     state=await page.evaluate(()=>({text:document.querySelector('#count').textContent,frame:lastDrawMetrics}));
@@ -71,12 +85,23 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     const hoverState=await page.evaluate(()=>({
       repaintCount:canvasRenderCount,
       visible:!document.querySelector('#emoji-hover-indicator').hidden,
-      hoveredName:hoveredItem?.name||null
+      hoveredName:hoveredItem?.name||null,
+      tooltipVisible:!document.querySelector('#emoji-hover-tooltip').hidden,
+      tooltipText:document.querySelector('#emoji-hover-tooltip').textContent
     }));
     console.log('hover',hoverState);
     assert(hoverState.visible,'Hover outline did not appear');
     assert.equal(hoverState.repaintCount,countBefore,'Hover caused full emoji canvas redraw');
     assert(hoverState.hoveredName,'Hover did not identify an emoji');
+    assert(hoverState.tooltipVisible,'Russian emoji name tooltip was not shown');
+    assert.equal(hoverState.tooltipText,hoverState.hoveredName,'Tooltip name mismatch');
+    const recent=await page.evaluate(()=>{
+      history=['😂','🌌'];renderRecent();
+      return {labels:[...document.querySelectorAll('#recent-grid button')].map(b=>b.title),count:document.querySelector('#recent-count').textContent};
+    });
+    console.log('recent',recent);
+    assert.equal(recent.labels.length,2,'Recent emoji strip did not populate');
+    assert(recent.count.includes('2'),'Recent count not updated');
     await page.locator('#grid-toggle').click();
     await page.locator('#catalog-hex').fill('#123456');
     await page.keyboard.press('Tab');
