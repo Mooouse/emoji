@@ -403,17 +403,20 @@ function findRecentInModel(native){
 function showRecentInCatalogue(native){
   if(!model.length||!native)return;
   const match=findRecentInModel(native);
-  if(!match)return; // Respect an active search filter rather than erasing it.
+  if(!match)return; // Don't modify the active search filter.
+  // Hovering a recently used emoji must NEVER scroll the catalogue.
+  // Only highlight its original tile if that tile is already visible.
+  const top=positions[match.row]-catalog.scrollTop;
   const visibleHeight=Math.min(catalog.clientHeight,surfaceHeight||catalog.clientHeight);
-  const target=positions[match.row];
-  // Move only the scrollable emoji list, not the outer page.
-  if(target<catalog.scrollTop+8||target+cellHeight>catalog.scrollTop+visibleHeight-8){
-    catalog.scrollTop=Math.max(0,target-Math.max(8,Math.round((visibleHeight-cellHeight)/2)));
-  }
-  scheduleWindow();
-  // The pending canvas frame will place the highlight using the new scroll offset.
+  if(top<0||top+cellHeight>visibleHeight)return;
+  // Also respect the actual browser viewport if the catalogue is partly offscreen.
+  const canvasBounds=viewCanvas?.getBoundingClientRect();
+  if(!canvasBounds||canvasBounds.top+top<0||canvasBounds.top+top+cellHeight>window.innerHeight)return;
   requestAnimationFrame(()=>{
     if(recentHoverNative!==native)return;
+    // The main scroll position may have changed before the callback fired.
+    const currentTop=positions[match.row]-catalog.scrollTop;
+    if(currentTop<0||currentTop+cellHeight>visibleHeight)return;
     showRecentHighlight(match);
   });
 }
