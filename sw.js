@@ -4,7 +4,16 @@ const VERSION='emoji-site-v2';
 const STATIC_CACHE=VERSION+'-assets';
 const allowed=new Set(['','index.html','emoji-data.json','flag-atlas.png','favicon.svg']);
 const base=new URL('./',self.location.href).pathname;
-self.addEventListener('install',event=>{self.skipWaiting()});
+self.addEventListener('install',event=>{
+  event.waitUntil((async()=>{
+    // First visit may load before this worker controls the page. Populate the
+    // cache during install so the very next refresh can work from local bytes.
+    const store=await caches.open(STATIC_CACHE);
+    await Promise.allSettled(['index.html','emoji-data.json','flag-atlas.png','favicon.svg']
+      .map(path=>store.add(new URL(path,self.registration.scope))));
+    await self.skipWaiting();
+  })());
+});
 self.addEventListener('activate',event=>{
   event.waitUntil((async()=>{
     const keys=await caches.keys();
