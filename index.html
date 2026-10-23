@@ -209,7 +209,13 @@ function rebuildRows(){
     }
   }
   positions=[0];for(const r of model)positions.push(positions[positions.length-1]+r.height);
-  layer.style.height=positions[positions.length-1]+'px';
+  if(!model.length){
+    layer.style.height='100%';
+    layer.innerHTML='<div class="empty"><div style="font-size:38px">🔎</div><strong>Ничего не найдено</strong>Попробуй другое название эмодзи.</div>';
+  }else{
+    if(layer.querySelector('.empty'))layer.textContent='';
+    layer.style.height=positions[positions.length-1]+'px';
+  }
 }
 function findRow(pixel){
   let lo=0,hi=model.length;
