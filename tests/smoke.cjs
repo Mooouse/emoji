@@ -72,12 +72,28 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     console.log('animated watermark',watermarkLight);
     assert(watermarkLight.oddImage.includes('data:image/svg+xml'),'Left-drifting row missing');
     assert(watermarkLight.evenImage.includes('data:image/svg+xml'),'Right-drifting row missing');
-    assert.equal(watermarkLight.width,'360px 280px');
+    assert.equal(watermarkLight.width,'400px 280px');
     assert.equal(watermarkLight.oddMotion,'an4ous-drift-left','First row should move left');
     assert.equal(watermarkLight.evenMotion,'an4ous-drift-right','Second row should move right');
     assert.equal(watermarkLight.oddDuration,'140s');
     assert.equal(watermarkLight.evenDuration,'140s');
     assert.equal(watermarkLight.pointerEvents,'none');
+    // The direction of travel must match the -35 degree word orientation.
+    const motion=await page.evaluate(()=>{
+      const keyframes=[...document.styleSheets].flatMap(sheet=>{
+        try{return [...sheet.cssRules].filter(r=>r.type===CSSRule.KEYFRAMES_RULE)}catch(e){return []}
+      });
+      const target=name=>keyframes.find(rule=>rule.name===name)?.cssRules[1]?.style.transform||'';
+      const before=getComputedStyle(document.body,'::before');
+      const after=getComputedStyle(document.body,'::after');
+      return {left:target('an4ous-drift-left'),right:target('an4ous-drift-right'),
+        beforeTop:before.top,beforeBottom:before.bottom,afterTop:after.top};
+    });
+    console.log('diagonal drift',motion);
+    assert(/translate3d\\(-400px, 280px, 0px\\)/.test(motion.left),'Left row does not travel down-left at 35 degrees');
+    assert(/translate3d\\(400px, -280px, 0px\\)/.test(motion.right),'Right row does not travel up-right at 35 degrees');
+    assert.equal(motion.beforeTop,'-280px','Diagonal animation lacks top edge coverage');
+
     const getLabels=image=>{
       const svg=decodeURIComponent(image.match(/data:image\/svg\+xml,([^"']+)/)[1]);
       assert(svg.includes('rotate(-35)'),'Background word orientation changed');
