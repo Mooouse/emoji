@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#ffffff">
+<link rel="icon" type="image/svg+xml" href="./favicon.svg">
+<link rel="shortcut icon" href="./favicon.svg">
 <meta name="description" content="Все эмодзи с русскими названиями — быстрый поиск, удобная сетка и копирование одним нажатием.">
 <title>Emoji — эмодзи для копирования</title>
 <style>
@@ -70,6 +72,28 @@ html.dark .empty strong{color:#f1f1f1}html.dark .footer{border-color:#333}
 .grid-popover{right:-49px}.virtual-row.heading{font-size:14px}.virtual-row.heading .muted{font-size:11px}
 }
 @media(prefers-reduced-motion:reduce){.toast,.emoji,.tab{transition:none}}
+
+/* Editable numeric grid controls */
+.grid-popover{width:350px}
+.slider-control{display:flex;align-items:center;gap:12px}
+.slider-control input[type="range"]{min-width:0;flex:1;accent-color:#ef9860;cursor:pointer}
+.slider-control .slider-number{width:70px;height:36px;flex:none;text-align:center;padding:4px 5px;border-radius:8px;border:1px solid #dfe2e6;background:#fff;color:#252932;font-size:14px;font-variant-numeric:tabular-nums}
+.slider-control .slider-number:focus{outline:2px solid #f7c99e;outline-offset:1px}
+.slider-number::-webkit-inner-spin-button,.slider-number::-webkit-outer-spin-button{opacity:1}
+.border-toggle{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;margin:4px 0 17px;padding:11px 12px;border:1px solid #e8e9eb;border-radius:9px;background:#f9fafb;color:#414954;font-size:13px}
+.border-toggle strong{border-radius:18px;padding:6px 10px;background:#e9f6ec;color:#367c4b;font-weight:700;font-size:12px}
+.border-toggle[aria-pressed="true"] strong{background:#fff0e6;color:#aa6135}
+.border-toggle:hover{border-color:#e4b78f}
+html.no-emoji-frames .emoji{border-color:transparent;border-width:0;background:transparent;border-radius:0}
+html.no-emoji-frames .emoji:hover{border:0;border-radius:9px;background:#fff0e5}
+html.dark.no-emoji-frames .emoji{background:transparent;border:0}
+html.dark.no-emoji-frames .emoji:hover{background:#3a2b20;border:0}
+html.dark .slider-control .slider-number{background:#171717;border-color:#3b3b3b;color:#f3f3f3}
+html.dark .border-toggle{background:#242424;border-color:#373737;color:#ddd}
+html.dark .border-toggle strong{background:#243a29;color:#a3d8a7}
+html.dark .border-toggle[aria-pressed="true"] strong{background:#513323;color:#ffd0a6}
+@media(max-width:390px){.grid-popover{right:-58px;width:min(350px,calc(100vw - 18px));padding:14px}}
+
 </style></head>
 <body>
 <header class="top"><div class="topin"><a href="./" class="logo">emoji<span>.</span></a>
@@ -80,9 +104,10 @@ html.dark .empty strong{color:#f1f1f1}html.dark .footer{border-color:#333}
 <div id="grid-popover" class="grid-popover" hidden>
 <div class="popup-header">Настройка сетки</div>
 <p class="popup-hint">Выбери, сколько эмодзи помещается по ширине и высоте.</p>
-<label class="slider-field" for="columns"><span class="slider-head">Колонок <output id="columns-value">16</output></span><input id="columns" type="range" min="4" max="30" value="16" step="1"></label>
-<label class="slider-field" for="rows"><span class="slider-head">Строк видно <output id="rows-value">9</output></span><input id="rows" type="range" min="3" max="20" value="9" step="1"></label>
-<label class="slider-field" for="emoji-size"><span class="slider-head">Размер эмодзи <output id="size-value">33 px</output></span><input id="emoji-size" type="range" min="22" max="50" value="33" step="1"></label>
+<div class="slider-field"><label class="slider-head" for="columns">Колонок <output id="columns-value">16</output></label><div class="slider-control"><input id="columns" type="range" min="1" max="30" value="16" step="1"><input class="slider-number" id="columns-number" type="number" min="1" max="80" step="1" value="16" inputmode="numeric" aria-label="Указать точное количество колонок"></div></div>
+<div class="slider-field"><label class="slider-head" for="rows">Строк видно <output id="rows-value">9</output></label><div class="slider-control"><input id="rows" type="range" min="1" max="20" value="9" step="1"><input class="slider-number" id="rows-number" type="number" min="1" max="80" step="1" value="9" inputmode="numeric" aria-label="Указать точное количество строк"></div></div>
+<div class="slider-field"><label class="slider-head" for="emoji-size">Размер эмодзи <output id="size-value">33 px</output></label><div class="slider-control"><input id="emoji-size" type="range" min="12" max="50" value="33" step="1"><input class="slider-number" id="emoji-size-number" type="number" min="12" max="96" step="1" value="33" inputmode="numeric" aria-label="Указать точный размер эмодзи в пикселях"></div></div>
+<button type="button" id="border-toggle" class="border-toggle" aria-pressed="false"><span>Рамки эмодзи</span><strong id="border-state">Включены</strong></button>
 <div class="popup-foot">Все эмодзи доступны прокруткой. Настройки сохраняются автоматически.</div>
 </div></div>
 <button type="button" class="tool-button" id="theme" aria-label="Переключить тему">🌙</button></div></div></header>
@@ -105,22 +130,55 @@ const normalize=t=>String(t||'').toLocaleLowerCase('ru').replaceAll('ё','е').r
 const escapeHTML=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const clamp=(n,min,max)=>Math.min(max,Math.max(min,n));
 function loadNumber(key,fallback,min,max){let v;try{v=Number(localStorage.getItem(key))}catch(e){}return Number.isFinite(v)&&v>0?clamp(Math.round(v),min,max):fallback}
-let columns=loadNumber('emoji_columns',16,4,30),visibleRows=loadNumber('emoji_visible_rows',9,3,20),fontSize=loadNumber('emoji_font_size',33,22,50);
+let columns=loadNumber('emoji_columns',16,1,80),visibleRows=loadNumber('emoji_visible_rows',9,1,80),fontSize=loadNumber('emoji_font_size',33,12,96);
 let effectiveColumns=columns,cellHeight=62,rowHeight=69,gap=7;
 let entries=[],categoryData=new Map(),nativeData=new Map(),history=[],term='',model=[],positions=[0],activeNodes=new Map();
-let searchTimer=0,toastTimer=0,scrollFrame=0,resizeFrame=0;
+let searchTimer=0,toastTimer=0,scrollFrame=0,resizeFrame=0,workFrame=0,workVersion=0,pendingRows=[];
 try{const h=JSON.parse(localStorage.getItem(historyKey)||'[]');history=Array.isArray(h)?h.slice(0,24):[]}catch(e){}
-const sliders=[{id:'columns',output:'columns-value',key:'emoji_columns',value:()=>columns,set:n=>columns=n},{id:'rows',output:'rows-value',key:'emoji_visible_rows',value:()=>visibleRows,set:n=>visibleRows=n},{id:'emoji-size',output:'size-value',key:'emoji_font_size',value:()=>fontSize,set:n=>fontSize=n}];
+const sliders=[
+  {id:'columns',key:'emoji_columns',min:1,max:80,value:()=>columns,set:n=>columns=n},
+  {id:'rows',key:'emoji_visible_rows',min:1,max:80,value:()=>visibleRows,set:n=>visibleRows=n},
+  {id:'emoji-size',key:'emoji_font_size',min:12,max:96,value:()=>fontSize,set:n=>fontSize=n}
+];
 for(const control of sliders){
-  const slider=el(control.id);slider.value=control.value();
-  slider.addEventListener('input',()=>{
-    const value=Number(slider.value);control.set(value);
-    try{localStorage.setItem(control.key,String(value))}catch(e){}
-    if(control.id==='columns')refreshGrid(true);
-    else if(control.id==='emoji-size')refreshGrid(true);
-    else updateDimensions();
-  });
+  const slider=el(control.id),number=el(control.id+'-number');
+  const baseMax=Number(slider.max);
+  function sync(){
+    const value=control.value();
+    slider.max=String(Math.max(baseMax,value));
+    slider.value=String(value);
+    number.value=String(value);
+  }
+  function commit(raw){
+    if(raw===''||!Number.isFinite(Number(raw))){sync();return}
+    const value=clamp(Math.round(Number(raw)),control.min,control.max);
+    if(value!==control.value()){
+      control.set(value);
+      try{localStorage.setItem(control.key,String(value))}catch(e){}
+      if(control.id==='rows')updateDimensions();
+      else refreshGrid(true);
+    }
+    sync();
+  }
+  slider.addEventListener('input',()=>commit(slider.value));
+  // Apply typed numbers on Enter or blur, not on every digit.
+  number.addEventListener('change',()=>commit(number.value));
+  number.addEventListener('keydown',e=>{if(e.key==='Enter')number.blur()});
+  sync();
 }
+let hideFrames=false;
+try{hideFrames=localStorage.getItem('emoji_hide_frames')==='true'}catch(e){}
+function applyFrames(){
+  document.documentElement.classList.toggle('no-emoji-frames',hideFrames);
+  el('border-toggle').setAttribute('aria-pressed',String(hideFrames));
+  el('border-state').textContent=hideFrames?'Выключены':'Включены';
+}
+el('border-toggle').addEventListener('click',()=>{
+  hideFrames=!hideFrames;
+  try{localStorage.setItem('emoji_hide_frames',String(hideFrames))}catch(e){}
+  applyFrames();
+});
+applyFrames();
 function setMenu(open){
   menu.hidden=!open;menuToggle.setAttribute('aria-expanded',String(open));
 }
@@ -234,21 +292,55 @@ function createRow(r,index){
   }
   return node;
 }
+function cancelRowWork(){
+  workVersion++;
+  pendingRows.length=0;
+  if(workFrame){cancelAnimationFrame(workFrame);workFrame=0}
+}
+function flushRowWork(){
+  workFrame=0;
+  const fragment=document.createDocumentFragment();
+  const start=performance.now();
+  let count=0;
+  // Emoji glyph rasterization is expensive: limit construction to 2 rows
+  // and 4 milliseconds of synchronous work per animation frame.
+  while(pendingRows.length&&count<2&&(count===0||performance.now()-start<4)){
+    const item=pendingRows.shift();
+    if(item.version!==workVersion||activeNodes.has(item.index))continue;
+    const node=createRow(model[item.index],item.index);
+    activeNodes.set(item.index,node);
+    fragment.appendChild(node);
+    count++;
+  }
+  if(fragment.childNodes.length)layer.appendChild(fragment);
+  if(pendingRows.length)workFrame=requestAnimationFrame(flushRowWork);
+}
 function renderWindow(){
   scrollFrame=0;
-  const start=findRow(Math.max(0,catalog.scrollTop-rowHeight*3));
-  const end=Math.min(model.length,findRow(catalog.scrollTop+catalog.clientHeight+rowHeight*3)+1);
+  const rect=catalog.getBoundingClientRect();
+  const viewTop=Math.max(0,-rect.top);
+  const viewBottom=Math.min(catalog.clientHeight,innerHeight-rect.top);
+  cancelRowWork();
+  let start=0,end=0;
+  if(viewBottom>viewTop&&model.length){
+    // Only virtualize the part actually visible in the browser window,
+    // not the full user-configured 80-row scroll container.
+    const startPx=Math.max(0,catalog.scrollTop+viewTop-rowHeight*2);
+    const endPx=catalog.scrollTop+viewBottom+rowHeight*2;
+    start=findRow(startPx);
+    end=Math.min(model.length,findRow(endPx)+1);
+  }
   for(const [index,node] of activeNodes){
     if(index<start||index>=end){node.remove();activeNodes.delete(index)}
   }
-  const fragment=document.createDocumentFragment();
+  const version=workVersion;
   for(let i=start;i<end;i++){
-    if(!activeNodes.has(i)){const node=createRow(model[i],i);activeNodes.set(i,node);fragment.appendChild(node)}
+    if(!activeNodes.has(i))pendingRows.push({index:i,version});
   }
-  if(fragment.childNodes.length)layer.appendChild(fragment);
-  if(!term&&model.length){
+  if(pendingRows.length)workFrame=requestAnimationFrame(flushRowWork);
+  if(!term&&model.length&&end>start){
     let group='';
-    for(let i=Math.min(findRow(catalog.scrollTop+4),model.length-1);i>=0;i--){
+    for(let i=Math.min(findRow(catalog.scrollTop+viewTop+4),model.length-1);i>=0;i--){
       if(model[i].kind==='header'){group=model[i].id;break}
     }
     updateActiveTab(group);
@@ -258,8 +350,10 @@ function scheduleWindow(){
   if(!scrollFrame)scrollFrame=requestAnimationFrame(renderWindow);
 }
 catalog.addEventListener('scroll',scheduleWindow,{passive:true});
+window.addEventListener('scroll',scheduleWindow,{passive:true});
 function refreshContent(resetScroll=true){
   if(scrollFrame){cancelAnimationFrame(scrollFrame);scrollFrame=0}
+  cancelRowWork();
   if(resetScroll)catalog.scrollTop=0;
   for(const node of activeNodes.values())node.remove();
   activeNodes.clear();
@@ -301,8 +395,9 @@ function updateSearch(){
 search.addEventListener('input',()=>{
   el('clear').classList.toggle('visible',!!search.value);
   clearTimeout(searchTimer);
-  // Filtering is cheap; DOM updates only for visible rows, not for all 1870 emojis.
-  searchTimer=setTimeout(updateSearch,95);
+  // Give keyboard input priority: abort expensive emoji-row creation immediately.
+  cancelRowWork();
+  searchTimer=setTimeout(updateSearch,165);
 });
 el('clear').addEventListener('click',()=>{
   clearTimeout(searchTimer);search.value='';term='';el('clear').classList.remove('visible');
