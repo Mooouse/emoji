@@ -254,6 +254,24 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     assert.equal(reset.sizeLabel,'28 px');
     assert.deepEqual(reset.keys,[null,null,null],'Reset did not clear saved background overrides');
 
+    await page.reload({waitUntil:'networkidle0'});
+    await page.waitForFunction(()=>document.querySelector('#emoji-viewport')?.width>0);
+    const afterReload=await page.evaluate(()=>({
+      speed:watermarkSpeed,
+      size:watermarkSize,
+      enabled:watermarkEnabled,
+      duration:getComputedStyle(document.body,'::before').animationDuration,
+      saved:localStorage.getItem('emoji_watermark_speed')
+    }));
+    console.log('reset persists after reload',afterReload);
+    assert.equal(afterReload.speed,1,'Speed defaults to 0 after reset/reload instead of 1');
+    assert.equal(afterReload.size,28);
+    assert(afterReload.enabled);
+    assert.equal(afterReload.duration,'140s');
+    assert.equal(afterReload.saved,null);
+    await page.locator('#watermark-menu-toggle').click();
+
+
     await page.keyboard.press('Escape');
     assert(await page.evaluate(()=>document.querySelector('#watermark-popover').hidden),'Background menu did not close on Escape');
     await page.evaluate(()=>{
