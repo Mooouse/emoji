@@ -226,6 +226,34 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
       enabled:!document.querySelector('#watermark-speed').disabled
     }));
     assert(!on.cls&&on.saved==='true'&&on.enabled,'Re-enabling background failed');
+
+    // One-click reset restores all three defaults and removes stored overrides.
+    // Start from deliberately non-default settings, including a disabled pattern.
+    await page.locator('#watermark-toggle').click();
+    await page.locator('#watermark-reset').click();
+    const reset=await page.evaluate(()=>({
+      speed:document.querySelector('#watermark-speed').value,
+      number:document.querySelector('#watermark-speed-number').value,
+      size:document.querySelector('#watermark-size').value,
+      enabled:!document.documentElement.classList.contains('watermark-off'),
+      paused:document.documentElement.classList.contains('watermark-paused'),
+      duration:getComputedStyle(document.body,'::before').animationDuration,
+      tile:getComputedStyle(document.body,'::before').backgroundSize,
+      speedLabel:document.querySelector('#watermark-speed-value').textContent,
+      sizeLabel:document.querySelector('#watermark-size-value').textContent,
+      keys:['emoji_watermark_enabled','emoji_watermark_speed','emoji_watermark_size'].map(k=>localStorage.getItem(k))
+    }));
+    console.log('background settings reset',reset);
+    assert.equal(reset.speed,'1');
+    assert.equal(reset.number,'1');
+    assert.equal(reset.size,'28');
+    assert(reset.enabled&&!reset.paused,'Reset did not re-enable the animated background');
+    assert.equal(reset.duration,'140s');
+    assert.equal(reset.tile,'400px 280px');
+    assert.equal(reset.speedLabel,'1.0×');
+    assert.equal(reset.sizeLabel,'28 px');
+    assert.deepEqual(reset.keys,[null,null,null],'Reset did not clear saved background overrides');
+
     await page.keyboard.press('Escape');
     assert(await page.evaluate(()=>document.querySelector('#watermark-popover').hidden),'Background menu did not close on Escape');
     await page.evaluate(()=>{
