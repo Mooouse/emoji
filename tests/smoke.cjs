@@ -90,8 +90,8 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
         beforeTop:before.top,beforeBottom:before.bottom,afterTop:after.top};
     });
     console.log('diagonal drift',motion);
-    assert(/translate3d\\(-400px, 280px, 0px\\)/.test(motion.left),'Left row does not travel down-left at 35 degrees');
-    assert(/translate3d\\(400px, -280px, 0px\\)/.test(motion.right),'Right row does not travel up-right at 35 degrees');
+    assert(motion.left.includes('translate3d(-400px, 280px, 0px)'),'Left row does not travel down-left at 35 degrees');
+    assert(motion.right.includes('translate3d(400px, -280px, 0px)'),'Right row does not travel up-right at 35 degrees');
     assert.equal(motion.beforeTop,'-280px','Diagonal animation lacks top edge coverage');
 
     const getLabels=image=>{
