@@ -55,6 +55,28 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     console.log('search',state);
     assert(state.text.includes('Найдено: 29'),'Russian search failed');
     assert(state.frame.icons>0,'Search icons did not render');
+    // Hover must NEVER repaint the full emoji canvas: separate composited overlay.
+    const hover=await page.evaluate(()=>{
+      const canvas=document.querySelector('#emoji-viewport');
+      const bounds=canvas.getBoundingClientRect();
+      const pad=window.innerWidth<680?7:12;
+      const usable=canvas.clientWidth-pad*2;
+      const cellWidth=(usable-(effectiveColumns-1)*gap)/effectiveColumns;
+      return {x:bounds.left+pad+cellWidth/2,y:bounds.top+48+cellHeight/2,step:cellWidth+gap};
+    });
+    await sleep(90);
+    const countBefore=await page.evaluate(()=>canvasRenderCount);
+    for(let i=0;i<6;i++)await page.mouse.move(hover.x+hover.step*i,hover.y);
+    await sleep(130);
+    const hoverState=await page.evaluate(()=>({
+      repaintCount:canvasRenderCount,
+      visible:!document.querySelector('#emoji-hover-indicator').hidden,
+      hoveredName:hoveredItem?.name||null
+    }));
+    console.log('hover',hoverState);
+    assert(hoverState.visible,'Hover outline did not appear');
+    assert.equal(hoverState.repaintCount,countBefore,'Hover caused full emoji canvas redraw');
+    assert(hoverState.hoveredName,'Hover did not identify an emoji');
     await page.locator('#grid-toggle').click();
     await page.locator('#catalog-hex').fill('#123456');
     await page.keyboard.press('Tab');
