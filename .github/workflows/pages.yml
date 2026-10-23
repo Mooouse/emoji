@@ -23,6 +23,14 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+      - name: Set up Node for flag atlas generation
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate color flag sprite sheet
+        run: |
+          npm install --no-save --ignore-scripts sharp@0.34.4
+          node scripts/build-flag-atlas.cjs
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload static website
