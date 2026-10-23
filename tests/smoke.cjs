@@ -90,8 +90,10 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
         beforeTop:before.top,beforeBottom:before.bottom,afterTop:after.top};
     });
     console.log('diagonal drift',motion);
-    assert(motion.left.includes('translate3d(-400px, 280px, 0px)'),'Left row does not travel down-left at 35 degrees');
-    assert(motion.right.includes('translate3d(400px, -280px, 0px)'),'Right row does not travel up-right at 35 degrees');
+    assert(motion.left.includes('var(--watermark-neg-x')&&motion.left.includes('var(--watermark-tile-y'),
+      'Left row does not track scaled diagonal tiles');
+    assert(motion.right.includes('var(--watermark-tile-x')&&motion.right.includes('var(--watermark-neg-y'),
+      'Right row does not track scaled diagonal tiles');
     assert.equal(motion.beforeTop,'-280px','Diagonal animation lacks top edge coverage');
 
     const getLabels=image=>{
@@ -125,6 +127,68 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     assert(Math.abs(dot([-400,280]))<0.1&&Math.abs(dot([400,-280]))<0.1,
       'Animation moves words across rows rather than along them');
     console.log('non-overlapping diagonal lanes',{oddLane,evenLane,gap:laneGap});
+
+    // Separate Background dropdown: size and speed are live CSS variables;
+    // disabling the overlay removes both pseudo-elements entirely.
+    await page.locator('#watermark-menu-toggle').click();
+    const menuOpen=await page.evaluate(()=>({
+      visible:!document.querySelector('#watermark-popover').hidden,
+      label:document.querySelector('#watermark-menu-toggle').textContent,
+      gridClosed:document.querySelector('#grid-popover').hidden
+    }));
+    assert(menuOpen.visible&&menuOpen.gridClosed&&menuOpen.label.includes('Фон'));
+    await page.evaluate(()=>{
+      const speed=document.querySelector('#watermark-speed');
+      speed.value='2';
+      speed.dispatchEvent(new Event('input',{bubbles:true}));
+      const size=document.querySelector('#watermark-size');
+      size.value='42';
+      size.dispatchEvent(new Event('input',{bubbles:true}));
+    });
+    const adjusted=await page.evaluate(()=>{
+      const odd=getComputedStyle(document.body,'::before');
+      return {
+        size:odd.backgroundSize,
+        duration:odd.animationDuration,
+        negativeX:getComputedStyle(document.documentElement).getPropertyValue('--watermark-neg-x').trim(),
+        speedLabel:document.querySelector('#watermark-speed-value').textContent,
+        sizeLabel:document.querySelector('#watermark-size-value').textContent,
+        savedSpeed:localStorage.getItem('emoji_watermark_speed'),
+        savedSize:localStorage.getItem('emoji_watermark_size')
+      };
+    });
+    console.log('watermark controls',adjusted);
+    assert.equal(adjusted.size,'600px 420px','Text size did not scale the tiles proportionally');
+    assert.equal(adjusted.duration,'105s','Speed did not change animation duration correctly');
+    assert.equal(adjusted.negativeX,'-600px');
+    assert.equal(adjusted.speedLabel,'2.0×');
+    assert.equal(adjusted.sizeLabel,'42 px');
+    assert.equal(adjusted.savedSpeed,'2');
+    assert.equal(adjusted.savedSize,'42');
+    await page.locator('#watermark-toggle').click();
+    const off=await page.evaluate(()=>({
+      cls:document.documentElement.classList.contains('watermark-off'),
+      visible:getComputedStyle(document.body,'::before').display,
+      saved:localStorage.getItem('emoji_watermark_enabled'),
+      disabled:document.querySelector('#watermark-speed').disabled
+    }));
+    assert(off.cls&&off.visible==='none'&&off.saved==='false'&&off.disabled,'Disabling background did not turn off its animation');
+    await page.locator('#watermark-toggle').click();
+    const on=await page.evaluate(()=>({
+      cls:document.documentElement.classList.contains('watermark-off'),
+      saved:localStorage.getItem('emoji_watermark_enabled'),
+      enabled:!document.querySelector('#watermark-speed').disabled
+    }));
+    assert(!on.cls&&on.saved==='true'&&on.enabled,'Re-enabling background failed');
+    await page.keyboard.press('Escape');
+    assert(await page.evaluate(()=>document.querySelector('#watermark-popover').hidden),'Background menu did not close on Escape');
+    await page.evaluate(()=>{
+      document.querySelector('#watermark-speed').value='1';
+      document.querySelector('#watermark-speed').dispatchEvent(new Event('input',{bubbles:true}));
+      document.querySelector('#watermark-size').value='28';
+      document.querySelector('#watermark-size').dispatchEvent(new Event('input',{bubbles:true}));
+    });
+
 
     await page.evaluate(()=>{isDark=true;applyTheme()});
     const watermarkDark=await page.evaluate(()=>({
