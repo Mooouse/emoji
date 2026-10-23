@@ -18,3 +18,5 @@
 - Первоначальный список/порядок эмодзи основан на [Emoji Mart data](https://github.com/missive/emoji-mart) (MIT).
 
 В каталоге сохранены английские имена как дополнительные поисковые термины.
+
+- Иконка «Млечный Путь» (🌌): [Twemoji](https://github.com/jdecked/twemoji), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), © Twitter / X и участники проекта Twemoji.
