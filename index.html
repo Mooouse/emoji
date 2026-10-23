@@ -271,6 +271,16 @@ html.dark .watermark-speed-control input[type="number"]{--watermark-number-bg:#1
 .watermark-speed-control input[type="number"]:disabled{opacity:.4}
 .watermark-speed-note{font-size:11px;color:#9298a1;margin:6px 0 0}
 
+.watermark-reset{
+  width:100%;padding:10px 12px;margin:2px 0 12px;
+  background:transparent;color:#777d85;border:1px solid #dfe2e6;
+  border-radius:8px;font-size:13px;font-weight:650;
+  text-align:center;cursor:pointer;
+}
+.watermark-reset:hover{border-color:#efb789;background:#fff0e6;color:#795039}
+.watermark-reset:focus-visible{outline:2px solid #ef9860;outline-offset:2px}
+html.dark .watermark-reset{color:#c0c0c0;border-color:#404040}
+html.dark .watermark-reset:hover{background:#33261d;color:#ffd7b7;border-color:#9e6a47}
 .watermark-popover .popup-foot{margin:2px 0 0}
 #watermark-menu-toggle[aria-expanded="true"] .grid-chevron{transform:rotate(180deg)}
 .watermark-menu-icon{font-size:17px;line-height:1}
@@ -316,6 +326,7 @@ html.watermark-paused body::before,html.watermark-paused body::after{animation-p
 <button type="button" id="watermark-toggle" class="border-toggle" aria-pressed="true"><span>Узор на фоне</span><strong id="watermark-state">Включён</strong></button>
 <div class="slider-field watermark-range"><label class="slider-head" for="watermark-speed">Скорость движения <output id="watermark-speed-value">1.0×</output></label><div class="watermark-speed-control"><input type="range" id="watermark-speed" min="0" max="50" value="1" step="0.1" aria-label="Скорость движения фоновых надписей от нуля до пятидесяти"><input type="number" id="watermark-speed-number" min="0" max="50" step="0.1" value="1" inputmode="decimal" aria-label="Точная скорость фоновых надписей от 0 до 50"></div><p class="watermark-speed-note">0 — неподвижный фон · 50 — максимальная скорость</p></div>
 <div class="slider-field watermark-range"><label class="slider-head" for="watermark-size">Размер надписей <output id="watermark-size-value">28 px</output></label><input type="range" id="watermark-size" min="14" max="48" value="28" step="1" aria-label="Размер фоновых надписей"></div>
+<button type="button" id="watermark-reset" class="watermark-reset">↺ Сбросить настройки фона</button>
 <p class="popup-foot">Настройки сохраняются автоматически.</p>
 </div></div>
 <button type="button" class="tool-button" id="theme" aria-label="Переключить тему">🌙</button></div></div></header>
@@ -463,6 +474,17 @@ el('watermark-size').addEventListener('input',event=>{
   if(!Number.isFinite(next))return;
   watermarkSize=clamp(Math.round(next),14,48);
   try{localStorage.setItem('emoji_watermark_size',String(watermarkSize))}catch(e){}
+  applyWatermarkSettings();
+});
+el('watermark-reset').addEventListener('click',()=>{
+  watermarkEnabled=true;
+  watermarkSpeed=1;
+  watermarkSize=28;
+  try{
+    localStorage.removeItem('emoji_watermark_enabled');
+    localStorage.removeItem('emoji_watermark_speed');
+    localStorage.removeItem('emoji_watermark_size');
+  }catch(e){}
   applyWatermarkSettings();
 });
 applyWatermarkSettings();
