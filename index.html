@@ -525,7 +525,7 @@ search.addEventListener('input',()=>{
   clearTimeout(searchTimer);
   // Give keyboard input priority: abort expensive emoji-row creation immediately.
   cancelRowWork();
-  searchTimer=setTimeout(updateSearch,165);
+  searchTimer=setTimeout(updateSearch,70);
 });
 el('clear').addEventListener('click',()=>{
   clearTimeout(searchTimer);search.value='';term='';el('clear').classList.remove('visible');
