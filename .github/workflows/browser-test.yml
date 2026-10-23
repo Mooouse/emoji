@@ -1,0 +1,19 @@
+name: Emoji browser smoke test
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser test dependency
+        run: npm install --no-save --ignore-scripts puppeteer-core@24
+      - name: Verify website in headless Chrome
+        run: node tests/smoke.cjs
