@@ -58,27 +58,54 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     assert(flags.ready&&flags.sheet[0]>=2560,'Pre-rendered country flag atlas did not load');
     assert(flags.pixels[3]>0,'Country flag tile is transparent or missing');
     // Body watermark must tile in both themes without obscuring the UI.
-    const watermarkLight=await page.evaluate(()=>({
-      image:getComputedStyle(document.body).backgroundImage,
-      size:getComputedStyle(document.body).backgroundSize
-    }));
-    assert(watermarkLight.image.includes('data:image/svg+xml'),'Light watermark missing');
-    assert.equal(watermarkLight.size,'360px 280px');
-    const pattern=decodeURIComponent(watermarkLight.image.match(/data:image\/svg\+xml,([^"']+)/)[1]);
-    const labels=[...pattern.matchAll(/<text[^>]*>([^<]+)<\/text>/g)].map(match=>match[1]);
-    assert.deepEqual(labels,['an4ous','emoji','emoji','an4ous'],'Background is not a true alternating checkerboard');
-    await page.evaluate(()=>{
-      isDark=true;
-      applyTheme();
+    const watermarkLight=await page.evaluate(()=>{
+      const odd=getComputedStyle(document.body,'::before');
+      const even=getComputedStyle(document.body,'::after');
+      return {
+        oddImage:odd.backgroundImage,evenImage:even.backgroundImage,
+        oddMotion:odd.animationName,evenMotion:even.animationName,
+        oddDuration:odd.animationDuration,evenDuration:even.animationDuration,
+        width:odd.backgroundSize,
+        pointerEvents:odd.pointerEvents
+      };
     });
+    console.log('animated watermark',watermarkLight);
+    assert(watermarkLight.oddImage.includes('data:image/svg+xml'),'Left-drifting row missing');
+    assert(watermarkLight.evenImage.includes('data:image/svg+xml'),'Right-drifting row missing');
+    assert.equal(watermarkLight.width,'360px 280px');
+    assert.equal(watermarkLight.oddMotion,'an4ous-drift-left','First row should move left');
+    assert.equal(watermarkLight.evenMotion,'an4ous-drift-right','Second row should move right');
+    assert.equal(watermarkLight.oddDuration,'140s');
+    assert.equal(watermarkLight.evenDuration,'140s');
+    assert.equal(watermarkLight.pointerEvents,'none');
+    const getLabels=image=>{
+      const svg=decodeURIComponent(image.match(/data:image\/svg\+xml,([^"']+)/)[1]);
+      assert(svg.includes('rotate(-35)'),'Background word orientation changed');
+      return [...svg.matchAll(/<text[^>]*>([^<]+)<\/text>/g)].map(match=>match[1]);
+    };
+    assert.deepEqual(getLabels(watermarkLight.oddImage),['an4ous','emoji'],'First row checkerboard incorrect');
+    assert.deepEqual(getLabels(watermarkLight.evenImage),['emoji','an4ous'],'Second row checkerboard incorrect');
+    await page.evaluate(()=>{isDark=true;applyTheme()});
     const watermarkDark=await page.evaluate(()=>({
-      image:getComputedStyle(document.body).backgroundImage,
+      oddImage:getComputedStyle(document.body,'::before').backgroundImage,
+      evenImage:getComputedStyle(document.body,'::after').backgroundImage,
       body:getComputedStyle(document.body).backgroundColor
     }));
-    assert(watermarkDark.image.includes('data:image/svg+xml'),'Dark watermark missing');
+    assert(watermarkDark.oddImage.includes('data:image/svg+xml'),'Dark first row absent');
+    assert(watermarkDark.evenImage.includes('data:image/svg+xml'),'Dark second row absent');
     assert.equal(watermarkDark.body,'rgb(14, 14, 14)');
-    assert.notEqual(watermarkLight.image,watermarkDark.image,'Dark watermark should use a different faint color');
-    await page.evaluate(()=>{isDark=false;applyTheme();});
+    assert.notEqual(watermarkDark.oddImage,watermarkLight.oddImage);
+    assert.deepEqual(getLabels(watermarkDark.oddImage),['an4ous','emoji']);
+    assert.deepEqual(getLabels(watermarkDark.evenImage),['emoji','an4ous']);
+    await page.emulateMediaFeatures([{name:'prefers-reduced-motion',value:'reduce'}]);
+    const reducedMotion=await page.evaluate(()=>({
+      odd:getComputedStyle(document.body,'::before').animationName,
+      even:getComputedStyle(document.body,'::after').animationName
+    }));
+    assert.equal(reducedMotion.odd,'none','Accessibility: animation ignores reduced motion setting');
+    assert.equal(reducedMotion.even,'none','Accessibility: animation ignores reduced motion setting');
+    await page.emulateMediaFeatures([{name:'prefers-reduced-motion',value:'no-preference'}]);
+    await page.evaluate(()=>{isDark=false;applyTheme()});
     assert(state.atlas,'Emoji texture atlas failed to generate');
     assert(state.domEmojiButtons===0,'Emoji DOM glyphs still exist');
     assert(state.fullHeight>state.viewport,'Not all emojis are reachable by scrolling');
