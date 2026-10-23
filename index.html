@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#ffffff">
 <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=3">
+<link rel="preload" as="image" href="./flag-atlas.png">
 <link rel="shortcut icon" href="./favicon.svg?v=3">
 <meta name="description" content="Все эмодзи с русскими названиями — быстрый поиск, удобная сетка и копирование одним нажатием.">
 <title>Emoji — эмодзи для копирования</title>
@@ -379,8 +380,10 @@ function renderRecent(){
     const tiles=grid.querySelectorAll('[data-recent-emoji]');
     for(let i=0;i<tiles.length;i++){
       const entry=recent[i],ctx=tiles[i].querySelector('canvas').getContext('2d');
-      const index=entry.atlasIndex;
-      ctx.drawImage(spriteAtlas,(index%ATLAS_COLS)*ATLAS_TILE,Math.floor(index/ATLAS_COLS)*ATLAS_TILE,
+      const useFlag=entry.flagIndex>=0&&flagAtlasImage;
+      const sheet=useFlag?flagAtlasImage:spriteAtlas;
+      const index=useFlag?entry.flagIndex:entry.atlasIndex;
+      ctx.drawImage(sheet,(index%ATLAS_COLS)*ATLAS_TILE,Math.floor(index/ATLAS_COLS)*ATLAS_TILE,
         ATLAS_TILE,ATLAS_TILE,0,0,ATLAS_TILE,ATLAS_TILE);
     }
   }
@@ -517,7 +520,15 @@ function findRow(pixel){
  */
 const ATLAS_TILE=80,ATLAS_COLS=32,ATLAS_GLYPH=50;
 const EMOJI_FONT='"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",emoji,sans-serif';
-let spriteAtlas=null;
+let spriteAtlas=null,flagAtlasImage=null;
+const flagAtlasLoader=new Image();
+flagAtlasLoader.decoding='async';
+flagAtlasLoader.onload=()=>{
+  flagAtlasImage=flagAtlasLoader;
+  if(entries.length){renderRecent();scheduleWindow();}
+};
+flagAtlasLoader.onerror=()=>console.warn('[emoji] Flag atlas unavailable; using system glyph fallback');
+flagAtlasLoader.src='./flag-atlas.png';
 let viewCanvas=null,viewContext=null;
 let surfaceWidth=0,surfaceHeight=0,surfaceDpr=1,drawOrigin=0;
 let frameId=0,atlasMs=0;
@@ -535,9 +546,11 @@ function makeAtlas(){
   g.font=ATLAS_GLYPH+'px '+EMOJI_FONT;
   g.textAlign='center';g.textBaseline='middle';
   const began=performance.now();
+  let flagCounter=0;
   for(let i=0;i<entries.length;i++){
     const e=entries[i];
     e.atlasIndex=i;
+    e.flagIndex=e.cat==='flags'?flagCounter++:-1;
     const x=(i%ATLAS_COLS)*ATLAS_TILE+ATLAS_TILE/2;
     const y=Math.floor(i/ATLAS_COLS)*ATLAS_TILE+ATLAS_TILE/2+2;
     // Never use fillText(..., maxWidth): Chromium horizontally squeezes
@@ -690,8 +703,12 @@ function drawViewport(){
         const outX=x+(cardWidth-glyphSize)/2;
         const outY=y+(cellHeight-glyphSize)/2;
         if(spriteAtlas){
-          const index=e.atlasIndex;
-          ctx.drawImage(spriteAtlas,(index%ATLAS_COLS)*ATLAS_TILE,Math.floor(index/ATLAS_COLS)*ATLAS_TILE,
+          // A prebuilt flag sheet fixes Windows browsers showing ISO country
+          // letters rather than colored flags. It's one already-cached image.
+          const useFlag=e.flagIndex>=0&&flagAtlasImage;
+          const sheet=useFlag?flagAtlasImage:spriteAtlas;
+          const index=useFlag?e.flagIndex:e.atlasIndex;
+          ctx.drawImage(sheet,(index%ATLAS_COLS)*ATLAS_TILE,Math.floor(index/ATLAS_COLS)*ATLAS_TILE,
              ATLAS_TILE,ATLAS_TILE,outX,outY,glyphSize,glyphSize);
         }
         visibleIcons++;
