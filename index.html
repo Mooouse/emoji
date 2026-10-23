@@ -207,6 +207,7 @@ html.dark .recent-emoji:hover{background:var(--emoji-card-hover,#3b2d22);border-
   font:500 12px/1.35 Arial,sans-serif;padding:7px 10px;
   text-align:center;
 }
+#emoji-hover-tooltip{transform:translateX(-50%);box-sizing:border-box}
 #emoji-hover-tooltip[hidden]{display:none!important}
 
 </style></head>
@@ -413,6 +414,15 @@ function showRecentInCatalogue(native){
     showRecentHighlight(match);
   });
 }
+// True visual centering uses the tooltip's measured width, never a
+// character-count approximation. At the edges it shifts only enough to fit.
+function centerHoverTooltip(centerX){
+  hoverTooltip.hidden=false;
+  const width=hoverTooltip.getBoundingClientRect().width;
+  const leftLimit=width/2+6;
+  const rightLimit=Math.max(leftLimit,surfaceWidth-width/2-6);
+  hoverTooltip.style.left=Math.min(rightLimit,Math.max(leftLimit,centerX))+'px';
+}
 function showRecentHighlight(match){
   if(!hoverIndicator||!viewCanvas)return;
   const pad=window.innerWidth<680?7:12;
@@ -427,10 +437,8 @@ function showRecentHighlight(match){
   hoverIndicator.style.transform='translate3d('+x+'px,'+y+'px,0)';
   hoverIndicator.hidden=false;
   hoverTooltip.textContent=match.entry.name;
-  const tipWidth=Math.min(240,Math.max(112,match.entry.name.length*7.5+22));
-  hoverTooltip.style.left=Math.max(6,Math.min(x+(cellWidth-tipWidth)/2,width-tipWidth-6))+'px';
   hoverTooltip.style.top=(y+cellHeight+44>surfaceHeight?Math.max(3,y-38):y+cellHeight+8)+'px';
-  hoverTooltip.hidden=false;
+  centerHoverTooltip(x+cellWidth/2);
 }
 function startRecentHover(button){
   const native=button.dataset.recentEmoji;
@@ -738,14 +746,11 @@ function onPointerHover(event){
   // Custom immediate tooltip with the Russian name, independent of the
   // actual emoji canvas (and without browser-native tooltip latency).
   hoverTooltip.textContent=hit.entry.name;
-  const tipWidth=Math.min(240,Math.max(112,hit.entry.name.length*7.5+22));
-  const tipLeft=Math.max(6,Math.min(hit.left+(hit.width-tipWidth)/2,surfaceWidth-tipWidth-6));
   const tipTop=localTop+cellHeight+8+36>surfaceHeight
     ?Math.max(3,localTop-38)
     :localTop+cellHeight+8;
-  hoverTooltip.style.left=tipLeft+'px';
   hoverTooltip.style.top=tipTop+'px';
-  hoverTooltip.hidden=false;
+  centerHoverTooltip(hit.left+hit.width/2);
 }
 function cancelRowWork(){}
 function refreshContent(resetScroll=true){
