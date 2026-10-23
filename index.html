@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#ffffff">
-<link rel="icon" type="image/svg+xml" href="./favicon.svg">
-<link rel="shortcut icon" href="./favicon.svg">
+<link rel="icon" type="image/svg+xml" href="./favicon.svg?v=3">
+<link rel="shortcut icon" href="./favicon.svg?v=3">
 <meta name="description" content="Все эмодзи с русскими названиями — быстрый поиск, удобная сетка и копирование одним нажатием.">
 <title>Emoji — эмодзи для копирования</title>
 <style>
@@ -39,7 +39,7 @@
 .virtual-row{position:absolute;left:12px;right:12px;min-width:0}
 .virtual-row.heading{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px;color:#2f343b;white-space:nowrap;overflow:hidden}
 .virtual-row.heading .section-icon{font-size:22px}.virtual-row.heading .muted{margin-left:auto;color:#a0a6af;font-size:12px;font-weight:400;padding-right:3px}
-.virtual-row.emoji-line{display:grid;grid-template-columns:repeat(var(--emoji-cols),minmax(0,1fr));gap:var(--emoji-gap);height:var(--emoji-cell)}
+.virtual-row.emoji-line{display:grid;grid-template-columns:repeat(var(--emoji-cols),minmax(0,1fr));gap:var(--emoji-gap);height:var(--emoji-cell);contain:layout paint}
 .emoji{display:grid;place-items:center;border-radius:9px;border:1px solid #f0f1f3;background:#f8f9fa;font-size:var(--emoji-size);line-height:1;min-width:0;height:var(--emoji-cell);padding:0;touch-action:manipulation;transition:background .13s,border-color .13s}
 .emoji:hover{background:#fff0e5;border-color:#f6b58a}.emoji:active{background:#fbe0c8}
 .empty{padding:65px 15px;text-align:center;color:#89919b;font-size:14px}
@@ -292,72 +292,98 @@ function createRow(r,index){
   }
   return node;
 }
+
+/*
+ * Stable lazy rows:
+ * - The entire catalogue has real scroll height immediately.
+ * - IntersectionObserver preloads emoji rows before they enter view.
+ * - Once a row is created, it is NOT removed/recreated on scroll.
+ * - Normal scrolling has no emoji DOM writes, avoiding font-rendering churn.
+ */
+let rowObserver;
+let hydrationQueue=[],queuedNodes=new Set(),hydrateFrame=0,hydrationGeneration=0;
 function cancelRowWork(){
-  workVersion++;
-  pendingRows.length=0;
-  if(workFrame){cancelAnimationFrame(workFrame);workFrame=0}
+  hydrationGeneration++;
+  hydrationQueue.length=0;
+  queuedNodes.clear();
+  if(hydrateFrame){cancelAnimationFrame(hydrateFrame);hydrateFrame=0}
 }
-function flushRowWork(){
-  workFrame=0;
+function enqueueRow(node){
+  if(node.dataset.ready==='yes'||queuedNodes.has(node))return;
+  queuedNodes.add(node);
+  hydrationQueue.push({node,index:Number(node.dataset.index),generation:hydrationGeneration});
+  if(!hydrateFrame)hydrateFrame=requestAnimationFrame(hydrateRows);
+}
+function hydrateRows(){
+  hydrateFrame=0;
+  const generation=hydrationGeneration;
+  // Prioritize nearby rows if someone drags the scrollbar a long distance.
+  const current=catalog.scrollTop+Math.min(catalog.clientHeight,window.innerHeight)/2;
+  hydrationQueue.sort((a,b)=>Math.abs(positions[a.index]-current)-Math.abs(positions[b.index]-current));
+  const began=performance.now();
+  let done=0;
+  while(hydrationQueue.length&&done<3&&(done===0||performance.now()-began<5)){
+    const item=hydrationQueue.shift();
+    queuedNodes.delete(item.node);
+    if(item.generation!==generation||!item.node.isConnected||item.node.dataset.ready==='yes')continue;
+    const row=model[item.index];
+    if(!row)continue;
+    if(row.kind==='header'){
+      item.node.innerHTML='<span class="section-icon">'+row.icon+'</span><span>'+escapeHTML(row.label)+'</span><span class="muted">'+row.count+' эмодзи</span>';
+    }else{
+      item.node.innerHTML=row.items.map(e=>'<button type="button" class="emoji" data-emoji="'+escapeHTML(e.native)+'" title="'+escapeHTML(e.name)+' — копировать" aria-label="Скопировать '+escapeHTML(e.name)+'">'+e.native+'</button>').join('');
+    }
+    item.node.dataset.ready='yes';
+    rowObserver.unobserve(item.node);
+    done++;
+  }
+  if(hydrationQueue.length)hydrateFrame=requestAnimationFrame(hydrateRows);
+}
+rowObserver=new IntersectionObserver(records=>{
+  for(const record of records){
+    if(record.isIntersecting)enqueueRow(record.target);
+  }
+},{root:catalog,rootMargin:'900px 0px 900px 0px',threshold:0});
+function createRowShell(row,index){
+  const node=document.createElement('div');
+  node.className='virtual-row '+(row.kind==='header'?'heading':'emoji-line');
+  node.style.top=positions[index]+'px';
+  node.style.height=(row.kind==='header'?48:cellHeight)+'px';
+  node.dataset.index=index;
+  return node;
+}
+function rebuildShells(){
+  rowObserver.disconnect();
+  if(!model.length)return; // rebuildRows already displays the no-results message.
   const fragment=document.createDocumentFragment();
-  const start=performance.now();
-  let count=0;
-  // Emoji glyph rasterization is expensive: limit construction to 2 rows
-  // and 4 milliseconds of synchronous work per animation frame.
-  while(pendingRows.length&&count<2&&(count===0||performance.now()-start<4)){
-    const item=pendingRows.shift();
-    if(item.version!==workVersion||activeNodes.has(item.index))continue;
-    const node=createRow(model[item.index],item.index);
-    activeNodes.set(item.index,node);
+  const rows=[];
+  for(let i=0;i<model.length;i++){
+    const node=createRowShell(model[i],i);
     fragment.appendChild(node);
-    count++;
+    rows.push(node);
   }
-  if(fragment.childNodes.length)layer.appendChild(fragment);
-  if(pendingRows.length)workFrame=requestAnimationFrame(flushRowWork);
+  layer.replaceChildren(fragment);
+  for(const row of rows)rowObserver.observe(row);
 }
-function renderWindow(){
-  scrollFrame=0;
-  const rect=catalog.getBoundingClientRect();
-  const viewTop=Math.max(0,-rect.top);
-  const viewBottom=Math.min(catalog.clientHeight,innerHeight-rect.top);
-  cancelRowWork();
-  let start=0,end=0;
-  if(viewBottom>viewTop&&model.length){
-    // Only virtualize the part actually visible in the browser window,
-    // not the full user-configured 80-row scroll container.
-    const startPx=Math.max(0,catalog.scrollTop+viewTop-rowHeight*2);
-    const endPx=catalog.scrollTop+viewBottom+rowHeight*2;
-    start=findRow(startPx);
-    end=Math.min(model.length,findRow(endPx)+1);
-  }
-  for(const [index,node] of activeNodes){
-    if(index<start||index>=end){node.remove();activeNodes.delete(index)}
-  }
-  const version=workVersion;
-  for(let i=start;i<end;i++){
-    if(!activeNodes.has(i))pendingRows.push({index:i,version});
-  }
-  if(pendingRows.length)workFrame=requestAnimationFrame(flushRowWork);
-  if(!term&&model.length&&end>start){
+let scrollNavTimer=0;
+catalog.addEventListener('scroll',()=>{
+  clearTimeout(scrollNavTimer);
+  scrollNavTimer=setTimeout(()=>{
+    if(term||!model.length)return;
     let group='';
-    for(let i=Math.min(findRow(catalog.scrollTop+viewTop+4),model.length-1);i>=0;i--){
+    for(let i=Math.min(findRow(catalog.scrollTop+4),model.length-1);i>=0;i--){
       if(model[i].kind==='header'){group=model[i].id;break}
     }
     updateActiveTab(group);
-  }
-}
-function scheduleWindow(){
-  if(!scrollFrame)scrollFrame=requestAnimationFrame(renderWindow);
-}
-catalog.addEventListener('scroll',scheduleWindow,{passive:true});
-window.addEventListener('scroll',scheduleWindow,{passive:true});
+  },150);
+},{passive:true});
+function scheduleWindow(){/* Rows are hydrated via IntersectionObserver; no scroll rerender. */}
 function refreshContent(resetScroll=true){
-  if(scrollFrame){cancelAnimationFrame(scrollFrame);scrollFrame=0}
   cancelRowWork();
+  rowObserver.disconnect();
   if(resetScroll)catalog.scrollTop=0;
-  for(const node of activeNodes.values())node.remove();
-  activeNodes.clear();
-  rebuildRows();scheduleWindow();
+  rebuildRows();
+  rebuildShells();
 }
 function refreshGrid(preservePosition=false){
   const previousTotal=positions[positions.length-1]||1;
@@ -397,6 +423,7 @@ search.addEventListener('input',()=>{
   clearTimeout(searchTimer);
   // Give keyboard input priority: abort expensive emoji-row creation immediately.
   cancelRowWork();
+  rowObserver.disconnect();
   searchTimer=setTimeout(updateSearch,165);
 });
 el('clear').addEventListener('click',()=>{
