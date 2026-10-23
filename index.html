@@ -355,7 +355,8 @@ function findRow(pixel){
  * A single canvas draws the visible portion using cheap drawImage operations.
  * No emoji DOM creation, font rasterization or asynchronous loading on scroll.
  */
-const ATLAS_TILE=64,ATLAS_COLS=32,ATLAS_GLYPH=52;
+const ATLAS_TILE=80,ATLAS_COLS=32,ATLAS_GLYPH=50;
+const EMOJI_FONT='"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",emoji,sans-serif';
 let spriteAtlas=null;
 let viewCanvas=null,viewContext=null;
 let surfaceWidth=0,surfaceHeight=0,surfaceDpr=1,drawOrigin=0;
@@ -370,7 +371,7 @@ function makeAtlas(){
   atlas.height=rows*ATLAS_TILE;
   const g=atlas.getContext('2d',{alpha:true});
   g.clearRect(0,0,atlas.width,atlas.height);
-  g.font=ATLAS_GLYPH+'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",emoji,sans-serif';
+  g.font=ATLAS_GLYPH+'px '+EMOJI_FONT;
   g.textAlign='center';g.textBaseline='middle';
   const began=performance.now();
   for(let i=0;i<entries.length;i++){
@@ -378,7 +379,17 @@ function makeAtlas(){
     e.atlasIndex=i;
     const x=(i%ATLAS_COLS)*ATLAS_TILE+ATLAS_TILE/2;
     const y=Math.floor(i/ATLAS_COLS)*ATLAS_TILE+ATLAS_TILE/2+2;
-    g.fillText(e.native,x,y,ATLAS_TILE);
+    // Never use fillText(..., maxWidth): Chromium horizontally squeezes
+    // wide native emoji when a maxWidth is supplied.
+    // If a multi-codepoint glyph is exceptionally wide, shrink its font
+    // UNIFORMLY so it fits without changing its aspect ratio.
+    const naturalWidth=g.measureText(e.native).width;
+    if(naturalWidth>ATLAS_TILE-10){
+      const fit=Math.max(8,Math.floor(ATLAS_GLYPH*(ATLAS_TILE-10)/naturalWidth));
+      g.font=fit+'px '+EMOJI_FONT;
+    }
+    g.fillText(e.native,x,y);
+    if(naturalWidth>ATLAS_TILE-10)g.font=ATLAS_GLYPH+'px '+EMOJI_FONT;
   }
   spriteAtlas=atlas;
   atlasMs=performance.now()-began;
@@ -485,7 +496,8 @@ function drawViewport(){
   const pad=window.innerWidth<680?7:12;
   const usableWidth=surfaceWidth-pad*2;
   const cardWidth=Math.max(2,(usableWidth-(effectiveColumns-1)*gap)/effectiveColumns);
-  const glyphSize=fontSize*(ATLAS_TILE/ATLAS_GLYPH);
+  // Use one size for both axes. The sprite and its native emoji keep a 1:1 aspect ratio.
+  const glyphSize=Math.max(1,Math.min(fontSize*(ATLAS_TILE/ATLAS_GLYPH),cardWidth-2,cellHeight-4));
   let visibleIcons=0;
   for(let r=start;r<end;r++){
     const record=model[r];
