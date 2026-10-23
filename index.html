@@ -160,6 +160,17 @@ html.no-emoji-frames .catalog .emoji:hover,html.dark.no-emoji-frames .catalog .e
 #emoji-viewport{image-rendering:auto;user-select:none;-webkit-user-select:none}
 #emoji-viewport:focus-visible{outline:2px solid #ee9b67}
 
+
+/* Stable hover highlight, composited separately from the emoji Canvas. */
+#emoji-hover-indicator{
+  position:absolute;left:0;top:0;z-index:2;pointer-events:none;
+  box-sizing:border-box;border-radius:9px;
+  border:1px solid var(--emoji-card-hover-border,#eeb890);
+  background:color-mix(in srgb,var(--emoji-card-hover,#fff0e5) 28%,transparent);
+  will-change:transform;
+}
+#emoji-hover-indicator[hidden]{display:none!important}
+
 </style></head>
 <body>
 <header class="top"><div class="topin"><a href="./" class="logo">emoji<span>.</span></a>
@@ -362,6 +373,7 @@ let viewCanvas=null,viewContext=null;
 let surfaceWidth=0,surfaceHeight=0,surfaceDpr=1,drawOrigin=0;
 let frameId=0,atlasMs=0;
 let hoveredItem=null,keyboardIndex=-1,currentNavTab='';
+let hoverIndicator=null,canvasRenderCount=0;
 let lastDrawMetrics={rows:0,icons:0,ms:0};
 function makeAtlas(){
   if(!entries.length)return;
@@ -405,13 +417,16 @@ function ensureCanvas(){
   viewCanvas.style.cssText='position:absolute;top:0;left:0;display:block;touch-action:pan-y;outline-offset:-3px;';
   viewContext=viewCanvas.getContext('2d',{alpha:false,desynchronized:true});
   layer.appendChild(viewCanvas);
+  hoverIndicator=document.createElement('div');
+  hoverIndicator.id='emoji-hover-indicator';
+  hoverIndicator.hidden=true;
+  hoverIndicator.setAttribute('aria-hidden','true');
+  layer.appendChild(hoverIndicator);
   viewCanvas.addEventListener('mousemove',onPointerHover,{passive:true});
-  viewCanvas.addEventListener('mouseleave',()=>{
-    hoveredItem=null;viewCanvas.style.cursor='default';viewCanvas.title='';scheduleWindow();
-  });
+  viewCanvas.addEventListener('mouseleave',()=>hideHover());
   viewCanvas.addEventListener('click',event=>{
     const item=hitTest(event);
-    if(item)copy(item.native);
+    if(item)copy(item.entry.native);
   });
   viewCanvas.addEventListener('keydown',event=>{
     if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' '].includes(event.key))return;
@@ -475,6 +490,7 @@ function themeColors(){
 }
 function drawViewport(){
   frameId=0;
+  canvasRenderCount++;
   if(!viewCanvas)return;
   resizeSurface();
   const loc=getCanvasLocation();
@@ -514,12 +530,9 @@ function drawViewport(){
       for(let c=0;c<record.items.length;c++){
         const e=record.items[c];
         const x=pad+c*(cardWidth+gap);
-        const active=hoveredItem===e;
-        if(!hideFrames||active){
-          const fill=active?colors.hover:(hideFrames?null:colors.card);
-          const stroke=hideFrames?null:(active?colors.hoverBorder:colors.border);
-          drawRoundRect(ctx,x,y,cardWidth,cellHeight,9,fill,stroke);
-        }
+        // Static emoji tiles: mouse hover is a separate DOM overlay, never
+        // repaint the entire canvas in response to pointer movement.
+        if(!hideFrames)drawRoundRect(ctx,x,y,cardWidth,cellHeight,9,colors.card,colors.border);
         const outX=x+(cardWidth-glyphSize)/2;
         const outY=y+(cellHeight-glyphSize)/2;
         if(spriteAtlas){
@@ -551,30 +564,40 @@ function hitTest(event){
   const record=model[rowId];
   if(!record||record.kind!=='emojis'||coordinate-positions[rowId]>cellHeight)return null;
   const pad=window.innerWidth<680?7:12;
-  const width=surfaceWidth-pad*2;
-  const itemWidth=Math.max(2,(width-(effectiveColumns-1)*gap)/effectiveColumns);
-  const dx=x-pad;if(dx<0)return null;
-  const column=Math.floor(dx/(itemWidth+gap));
-  if(column<0||column>=record.items.length||dx-column*(itemWidth+gap)>itemWidth)return null;
-  return record.items[column];
+  const usableWidth=surfaceWidth-pad*2;
+  const cardWidth=Math.max(2,(usableWidth-(effectiveColumns-1)*gap)/effectiveColumns);
+  const dx=x-pad;
+  if(dx<0)return null;
+  const column=Math.floor(dx/(cardWidth+gap));
+  if(column<0||column>=record.items.length||dx-column*(cardWidth+gap)>cardWidth)return null;
+  return {entry:record.items[column],left:pad+column*(cardWidth+gap),top:positions[rowId],width:cardWidth};
+}
+function hideHover(){
+  hoveredItem=null;
+  if(hoverIndicator)hoverIndicator.hidden=true;
+  if(viewCanvas)viewCanvas.style.cursor='default';
 }
 function onPointerHover(event){
-  const item=hitTest(event);
-  if(item===hoveredItem)return;
-  hoveredItem=item;
-  viewCanvas.style.cursor=item?'pointer':'default';
-  viewCanvas.title=item?item.name+' — копировать':'';
-  scheduleWindow();
+  const hit=hitTest(event);
+  if(!hit){if(hoveredItem)hideHover();return}
+  if(hoveredItem===hit.entry)return;
+  hoveredItem=hit.entry;
+  viewCanvas.style.cursor='pointer';
+  hoverIndicator.style.width=hit.width+'px';
+  hoverIndicator.style.height=cellHeight+'px';
+  hoverIndicator.style.transform='translate3d('+hit.left+'px,'+hit.top+'px,0)';
+  hoverIndicator.hidden=false;
+  // Never call scheduleWindow() here: the expensive emoji canvas is unchanged.
 }
 function cancelRowWork(){}
 function refreshContent(resetScroll=true){
   if(resetScroll)catalog.scrollTop=0;
-  hoveredItem=null;
+  hideHover();
   rebuildRows();
   ensureCanvas();
   scheduleWindow();
 }
-catalog.addEventListener('scroll',scheduleWindow,{passive:true});
+catalog.addEventListener('scroll',()=>{hideHover();scheduleWindow()},{passive:true});
 window.addEventListener('scroll',scheduleWindow,{passive:true});
 function refreshGrid(preservePosition=false){
   const previousTotal=positions[positions.length-1]||1;
