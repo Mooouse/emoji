@@ -301,11 +301,12 @@ function createRow(r,index){
  * - Normal scrolling has no emoji DOM writes, avoiding font-rendering churn.
  */
 let rowObserver;
-let hydrationQueue=[],queuedNodes=new Set(),hydrateFrame=0,hydrationGeneration=0;
+let hydrationQueue=[],queuedNodes=new Set(),relevantRows=new Set(),hydrateFrame=0,hydrationGeneration=0;
 function cancelRowWork(){
   hydrationGeneration++;
   hydrationQueue.length=0;
   queuedNodes.clear();
+  relevantRows.clear();
   if(hydrateFrame){cancelAnimationFrame(hydrateFrame);hydrateFrame=0}
 }
 function enqueueRow(node){
@@ -325,7 +326,7 @@ function hydrateRows(){
   while(hydrationQueue.length&&done<3&&(done===0||performance.now()-began<5)){
     const item=hydrationQueue.shift();
     queuedNodes.delete(item.node);
-    if(item.generation!==generation||!item.node.isConnected||item.node.dataset.ready==='yes')continue;
+    if(item.generation!==generation||!item.node.isConnected||!relevantRows.has(item.node)||item.node.dataset.ready==='yes')continue;
     const row=model[item.index];
     if(!row)continue;
     if(row.kind==='header'){
@@ -341,7 +342,8 @@ function hydrateRows(){
 }
 rowObserver=new IntersectionObserver(records=>{
   for(const record of records){
-    if(record.isIntersecting)enqueueRow(record.target);
+    if(record.isIntersecting){relevantRows.add(record.target);enqueueRow(record.target)}
+    else relevantRows.delete(record.target);
   }
 },{root:null,rootMargin:'900px 0px 900px 0px',scrollMargin:'650px 0px 650px 0px',threshold:0});
 function createRowShell(row,index){
