@@ -153,16 +153,38 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
       hideFrames=false;
       applyFrames();
     });
-    // Hovering a recent emoji should locate and highlight its real catalogue item
-    // without changing the search term automatically.
+    // Recent emoji hover must not scroll to an off-screen catalogue item.
     await page.locator('#clear').click();
     await sleep(140);
     const recentCoords=await page.evaluate(()=>{
       const b=document.querySelector('#recent-grid button').getBoundingClientRect();
+      const c=document.querySelector('#catalog');
+      c.scrollTop=c.scrollHeight-c.clientHeight;
       return {x:b.left+b.width/2,y:b.top+b.height/2};
     });
+    await sleep(120);
+    const beforeOffscreen=await page.evaluate(()=>document.querySelector('#catalog').scrollTop);
     await page.mouse.move(recentCoords.x,recentCoords.y);
-    await sleep(230);
+    await sleep(180);
+    const offscreen=await page.evaluate(()=>({
+      scrollTop:document.querySelector('#catalog').scrollTop,
+      highlighted:!document.querySelector('#emoji-hover-indicator').hidden
+    }));
+    console.log('recent hover offscreen',offscreen);
+    assert.equal(offscreen.scrollTop,beforeOffscreen,'Recent hover scrolled to an off-screen emoji');
+    assert(!offscreen.highlighted,'Off-screen emoji was highlighted');
+    await page.mouse.move(3,3);
+    await sleep(55);
+    // If the catalogue item is already in view, hover still highlights it.
+    await page.evaluate(()=>{
+      const native=document.querySelector('#recent-grid button').dataset.recentEmoji;
+      const match=findRecentInModel(native);
+      const c=document.querySelector('#catalog');
+      c.scrollTop=Math.max(0,positions[match.row]-20);
+    });
+    await sleep(130);
+    await page.mouse.move(recentCoords.x,recentCoords.y);
+    await sleep(180);
     const located=await page.evaluate(()=>({
       hoveredName:hoveredItem?.name,
       recentName:document.querySelector('#recent-grid button').dataset.label,
