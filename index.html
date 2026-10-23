@@ -129,6 +129,15 @@ html.dark #native-picker,html.dark #reset-background{border-color:#414141}
 html.dark #reset-background{background:#272727;color:#dedede}
 html.dark .palette-picker{border-color:#4a4a4a}
 
+
+/* Lightweight windowed emoji rendering; no browser-level all-row painting. */
+.virtual-row.emoji-line{
+  content-visibility:visible;
+  contain:layout style paint;
+  contain-intrinsic-size:none;
+}
+.emoji{transition:none;will-change:auto}
+
 </style></head>
 <body>
 <header class="top"><div class="topin"><a href="./" class="logo">emoji<span>.</span></a>
@@ -338,34 +347,128 @@ function createRow(r,index){
 
 
 /*
- * Scroll performance: emoji button nodes are created only once per data
- * change, never in a scrolling callback. CSS content-visibility skips layout
- * and painting for offscreen emoji rows.
+ * Bounded window virtualization.
+ * Only a small set of actual emoji DOM nodes exists at any time, regardless of
+ * catalogue size. Positions preserve the full scrollbar and keyboard access.
+ * Cached detached rows make revisiting nearby items inexpensive.
  */
-function cancelRowWork(){}
-function scheduleWindow(){}
-function rebuildShells(){
-  if(!model.length)return;
-  const fragment=document.createDocumentFragment();
-  for(let i=0;i<model.length;i++)fragment.appendChild(createRow(model[i],i));
-  layer.replaceChildren(fragment);
+const rowCache=new Map();
+let windowFrame=0;
+let rangeStart=0,rangeEnd=0;
+let renderGeneration=0;
+let pendingWindowRows=[];
+let pendingFrame=0;
+let currentNavTab='';
+const OVERSCAN=5;
+const MAX_CACHE_ROWS=32;
+function cancelRowWork(){
+  renderGeneration++;
+  pendingWindowRows=[];
+  if(pendingFrame){cancelAnimationFrame(pendingFrame);pendingFrame=0}
+  if(windowFrame){cancelAnimationFrame(windowFrame);windowFrame=0}
 }
-let scrollNavTimer=0;
-catalog.addEventListener('scroll',()=>{
-  clearTimeout(scrollNavTimer);
-  scrollNavTimer=setTimeout(()=>{
-    if(term||!model.length)return;
+function clearRowCache(){
+  cancelRowWork();
+  rowCache.clear();
+  for(const node of activeNodes.values())node.remove();
+  activeNodes.clear();
+  rangeStart=rangeEnd=0;
+}
+function storeCachedRow(index,node){
+  rowCache.delete(index);
+  rowCache.set(index,node);
+  if(rowCache.size>MAX_CACHE_ROWS){
+    const oldest=rowCache.keys().next().value;
+    rowCache.delete(oldest);
+  }
+}
+function getRowNode(index){
+  if(rowCache.has(index)){
+    const node=rowCache.get(index);
+    rowCache.delete(index);
+    return node;
+  }
+  return createRow(model[index],index);
+}
+function visibleRange(){
+  if(!model.length)return {start:0,end:0};
+  const bounds=catalog.getBoundingClientRect();
+  const clippedTop=Math.max(0,-bounds.top);
+  const clippedBottom=Math.min(catalog.clientHeight,window.innerHeight-bounds.top);
+  const topPx=catalog.scrollTop+(clippedBottom>clippedTop?clippedTop:0);
+  const height=clippedBottom>clippedTop?clippedBottom-clippedTop:Math.min(catalog.clientHeight,700);
+  return {
+    start:Math.min(model.length-1,findRow(topPx)),
+    end:Math.min(model.length,findRow(topPx+height)+1)
+  };
+}
+function flushPendingRows(){
+  pendingFrame=0;
+  const began=performance.now();
+  let done=0;
+  const fragment=document.createDocumentFragment();
+  while(pendingWindowRows.length&&done<4&&(done===0||performance.now()-began<5)){
+    const task=pendingWindowRows.shift();
+    if(task.generation!==renderGeneration||activeNodes.has(task.index))continue;
+    const node=getRowNode(task.index);
+    activeNodes.set(task.index,node);
+    fragment.appendChild(node);
+    done++;
+  }
+  if(fragment.childNodes.length)layer.appendChild(fragment);
+  if(pendingWindowRows.length)pendingFrame=requestAnimationFrame(flushPendingRows);
+}
+function renderWindow(force=false){
+  windowFrame=0;
+  if(!model.length)return;
+  const visible=visibleRange();
+  // Avoid touching the DOM while the viewport remains within the cached band.
+  if(!force&&visible.start>=rangeStart+2&&visible.end<=rangeEnd-2)return;
+  const nextStart=Math.max(0,visible.start-OVERSCAN);
+  const nextEnd=Math.min(model.length,visible.end+OVERSCAN);
+  if(!force&&nextStart===rangeStart&&nextEnd===rangeEnd)return;
+  cancelRowWork();
+  rangeStart=nextStart;rangeEnd=nextEnd;
+  for(const [index,node] of activeNodes){
+    if(index<nextStart||index>=nextEnd){
+      activeNodes.delete(index);
+      node.remove();
+      storeCachedRow(index,node);
+    }
+  }
+  const tasks=[];
+  // Visible rows first, prefetch nearest outside rows in later frames.
+  for(let i=visible.start;i<visible.end;i++)if(!activeNodes.has(i))tasks.push(i);
+  for(let d=1;d<=OVERSCAN;d++){
+    const a=visible.start-d,b=visible.end+d-1;
+    if(a>=nextStart&&!activeNodes.has(a))tasks.push(a);
+    if(b<nextEnd&&!activeNodes.has(b))tasks.push(b);
+  }
+  const generation=renderGeneration;
+  pendingWindowRows=tasks.map(index=>({index,generation}));
+  if(pendingWindowRows.length)pendingFrame=requestAnimationFrame(flushPendingRows);
+  if(!term){
     let group='';
-    for(let i=Math.min(findRow(catalog.scrollTop+4),model.length-1);i>=0;i--){
+    for(let i=visible.start;i>=0;i--){
       if(model[i].kind==='header'){group=model[i].id;break}
     }
-    updateActiveTab(group);
-  },180);
-},{passive:true});
+    if(group!==currentNavTab){
+      currentNavTab=group;
+      updateActiveTab(group);
+    }
+  }
+}
+function scheduleWindow(){
+  if(!windowFrame)windowFrame=requestAnimationFrame(()=>renderWindow());
+}
+catalog.addEventListener('scroll',scheduleWindow,{passive:true});
+window.addEventListener('scroll',scheduleWindow,{passive:true});
 function refreshContent(resetScroll=true){
+  clearRowCache();
   if(resetScroll)catalog.scrollTop=0;
   rebuildRows();
-  rebuildShells();
+  if(model.length)layer.replaceChildren();
+  renderWindow(true);
 }
 function refreshGrid(preservePosition=false){
   const previousTotal=positions[positions.length-1]||1;
