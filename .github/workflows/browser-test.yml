@@ -13,7 +13,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install browser test dependency
-        run: npm install --no-save --ignore-scripts puppeteer-core@24
+      - name: Install browser and flag atlas dependencies
+        run: npm install --no-save --ignore-scripts puppeteer-core@24 sharp@0.34.4
+      - name: Build flag sprite sheet
+        run: node scripts/build-flag-atlas.cjs
       - name: Verify website in headless Chrome
         run: node tests/smoke.cjs
