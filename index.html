@@ -155,6 +155,11 @@ html.no-emoji-frames .catalog .emoji:hover,html.dark.no-emoji-frames .catalog .e
   border:0;background:var(--emoji-card-hover,#fff0e5);
 }
 
+
+/* Fully rasterized native-font emoji atlas rendered on a single GPU-friendly canvas. */
+#emoji-viewport{image-rendering:auto;user-select:none;-webkit-user-select:none}
+#emoji-viewport:focus-visible{outline:2px solid #ee9b67}
+
 </style></head>
 <body>
 <header class="top"><div class="topin"><a href="./" class="logo">emoji<span>.</span></a>
@@ -224,7 +229,7 @@ for(const control of sliders){
     if(value!==control.value()){
       control.set(value);
       try{localStorage.setItem(control.key,String(value))}catch(e){}
-      if(control.id==='rows')updateDimensions();
+      if(control.id==='rows'){updateDimensions();scheduleWindow();}
       else refreshGrid(true);
     }
     sync();
@@ -245,7 +250,7 @@ function applyFrames(){
 el('border-toggle').addEventListener('click',()=>{
   hideFrames=!hideFrames;
   try{localStorage.setItem('emoji_hide_frames',String(hideFrames))}catch(e){}
-  applyFrames();
+  applyFrames();scheduleWindow();
 });
 applyFrames();
 function setMenu(open){
@@ -268,7 +273,7 @@ function applyTheme(){
   document.querySelector('meta[name="theme-color"]').content=isDark?'#0e0e0e':'#ffffff';
 }
 themeButton.addEventListener('click',()=>{
-  isDark=!isDark;try{localStorage.setItem('emoji_theme',isDark?'dark':'light')}catch(e){}applyTheme();applyBackground();
+  isDark=!isDark;try{localStorage.setItem('emoji_theme',isDark?'dark':'light')}catch(e){}applyTheme();applyBackground();scheduleWindow();
 });
 applyTheme();
 function updateDimensions(){
@@ -336,157 +341,229 @@ function rebuildRows(){
     }
   }
   positions=[0];for(const r of model)positions.push(positions[positions.length-1]+r.height);
-  if(!model.length){
-    layer.style.height='100%';
-    layer.innerHTML='<div class="empty"><div style="font-size:38px">🔎</div><strong>Ничего не найдено</strong>Попробуй другое название эмодзи.</div>';
-  }else{
-    if(layer.querySelector('.empty'))layer.textContent='';
-    layer.style.height=positions[positions.length-1]+'px';
-  }
+  layer.style.height=Math.max(catalog.clientHeight,positions[positions.length-1])+'px';
 }
 function findRow(pixel){
   let lo=0,hi=model.length;
   while(lo<hi){const mid=(lo+hi)>>1;if(positions[mid+1]<=pixel)lo=mid+1;else hi=mid}
   return lo;
 }
-function createRow(r,index){
-  const node=document.createElement('div');
-  node.className='virtual-row '+(r.kind==='header'?'heading':'emoji-line');
-  node.style.top=positions[index]+'px';
-  node.style.height=(r.kind==='header'?48:cellHeight)+'px';
-  if(r.kind==='header'){
-    node.innerHTML='<span class="section-icon">'+r.icon+'</span><span>'+escapeHTML(r.label)+'</span><span class="muted">'+r.count+' эмодзи</span>';
-  }else{
-    node.innerHTML=r.items.map(e=>'<button type="button" class="emoji" data-emoji="'+escapeHTML(e.native)+'" title="'+escapeHTML(e.name)+' — копировать" aria-label="Скопировать '+escapeHTML(e.name)+'">'+e.native+'</button>').join('');
-  }
-  return node;
-}
-
 
 /*
- * Bounded window virtualization.
- * Only a small set of actual emoji DOM nodes exists at any time, regardless of
- * catalogue size. Positions preserve the full scrollbar and keyboard access.
- * Cached detached rows make revisiting nearby items inexpensive.
+ * Instant scroll renderer:
+ * All emoji glyphs are rasterized ONCE into a native-font texture atlas.
+ * A single canvas draws the visible portion using cheap drawImage operations.
+ * No emoji DOM creation, font rasterization or asynchronous loading on scroll.
  */
-const rowCache=new Map();
-let windowFrame=0;
-let rangeStart=0,rangeEnd=0;
-let renderGeneration=0;
-let pendingWindowRows=[];
-let pendingFrame=0;
-let currentNavTab='';
-const OVERSCAN=5;
-const MAX_CACHE_ROWS=32;
-function cancelRowWork(){
-  renderGeneration++;
-  pendingWindowRows=[];
-  if(pendingFrame){cancelAnimationFrame(pendingFrame);pendingFrame=0}
-  if(windowFrame){cancelAnimationFrame(windowFrame);windowFrame=0}
-}
-function clearRowCache(){
-  cancelRowWork();
-  rowCache.clear();
-  for(const node of activeNodes.values())node.remove();
-  activeNodes.clear();
-  rangeStart=rangeEnd=0;
-}
-function storeCachedRow(index,node){
-  rowCache.delete(index);
-  rowCache.set(index,node);
-  if(rowCache.size>MAX_CACHE_ROWS){
-    const oldest=rowCache.keys().next().value;
-    rowCache.delete(oldest);
+const ATLAS_TILE=64,ATLAS_COLS=32,ATLAS_GLYPH=52;
+let spriteAtlas=null;
+let viewCanvas=null,viewContext=null;
+let surfaceWidth=0,surfaceHeight=0,surfaceDpr=1,drawOrigin=0;
+let frameId=0,atlasMs=0;
+let hoveredItem=null,keyboardIndex=-1;
+let lastDrawMetrics={rows:0,icons:0,ms:0};
+function makeAtlas(){
+  if(!entries.length)return;
+  const rows=Math.ceil(entries.length/ATLAS_COLS);
+  const atlas=document.createElement('canvas');
+  atlas.width=ATLAS_COLS*ATLAS_TILE;
+  atlas.height=rows*ATLAS_TILE;
+  const g=atlas.getContext('2d',{alpha:true});
+  g.clearRect(0,0,atlas.width,atlas.height);
+  g.font=ATLAS_GLYPH+'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",emoji,sans-serif';
+  g.textAlign='center';g.textBaseline='middle';
+  const began=performance.now();
+  for(let i=0;i<entries.length;i++){
+    const e=entries[i];
+    e.atlasIndex=i;
+    const x=(i%ATLAS_COLS)*ATLAS_TILE+ATLAS_TILE/2;
+    const y=Math.floor(i/ATLAS_COLS)*ATLAS_TILE+ATLAS_TILE/2+2;
+    g.fillText(e.native,x,y,ATLAS_TILE);
   }
+  spriteAtlas=atlas;
+  atlasMs=performance.now()-began;
+  console.info('[emoji] Prepared all '+entries.length+' native emoji textures in '+Math.round(atlasMs)+' ms (one time).');
 }
-function getRowNode(index){
-  if(rowCache.has(index)){
-    const node=rowCache.get(index);
-    rowCache.delete(index);
-    return node;
-  }
-  return createRow(model[index],index);
+function ensureCanvas(){
+  if(viewCanvas)return;
+  viewCanvas=document.createElement('canvas');
+  viewCanvas.id='emoji-viewport';
+  viewCanvas.tabIndex=0;
+  viewCanvas.setAttribute('role','img');
+  viewCanvas.setAttribute('aria-label','Сетка эмодзи. Нажмите на эмодзи для копирования.');
+  viewCanvas.style.cssText='position:absolute;top:0;left:0;display:block;touch-action:pan-y;outline-offset:-3px;';
+  viewContext=viewCanvas.getContext('2d',{alpha:false,desynchronized:true});
+  layer.appendChild(viewCanvas);
+  viewCanvas.addEventListener('mousemove',onPointerHover,{passive:true});
+  viewCanvas.addEventListener('mouseleave',()=>{
+    hoveredItem=null;viewCanvas.style.cursor='default';viewCanvas.title='';scheduleWindow();
+  });
+  viewCanvas.addEventListener('click',event=>{
+    const item=hitTest(event);
+    if(item)copy(item.native);
+  });
+  viewCanvas.addEventListener('keydown',event=>{
+    if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' '].includes(event.key))return;
+    event.preventDefault();
+    if(event.key==='Enter'||event.key===' '){
+      if(keyboardIndex>=0&&entries[keyboardIndex])copy(entries[keyboardIndex].native);
+      return;
+    }
+    const step=event.key==='ArrowUp'?-effectiveColumns:event.key==='ArrowDown'?effectiveColumns:event.key==='ArrowLeft'?-1:1;
+    keyboardIndex=Math.max(0,Math.min(entries.length-1,keyboardIndex<0?0:keyboardIndex+step));
+    const target=entries[keyboardIndex];
+    const row=model.findIndex(r=>r.kind==='emojis'&&r.items.some(e=>e===target));
+    if(row>=0){
+      catalog.scrollTop=Math.max(0,positions[row]-catalog.clientHeight/2);
+      hoveredItem=target;scheduleWindow();
+    }
+  });
 }
-function visibleRange(){
-  if(!model.length)return {start:0,end:0};
-  const bounds=catalog.getBoundingClientRect();
-  const clippedTop=Math.max(0,-bounds.top);
-  const clippedBottom=Math.min(catalog.clientHeight,window.innerHeight-bounds.top);
-  const topPx=catalog.scrollTop+(clippedBottom>clippedTop?clippedTop:0);
-  const height=clippedBottom>clippedTop?clippedBottom-clippedTop:Math.min(catalog.clientHeight,700);
+function resizeSurface(){
+  if(!viewCanvas)return;
+  const width=Math.max(1,catalog.clientWidth);
+  // Do not allocate enormous textures if the user chooses 80 visible rows.
+  const height=Math.max(1,Math.min(catalog.clientHeight,Math.max(560,Math.min(1400,window.innerHeight+240))));
+  const dpr=Math.min(window.devicePixelRatio||1,1.5);
+  if(width===surfaceWidth&&height===surfaceHeight&&dpr===surfaceDpr)return;
+  surfaceWidth=width;surfaceHeight=height;surfaceDpr=dpr;
+  viewCanvas.style.width=width+'px';
+  viewCanvas.style.height=height+'px';
+  viewCanvas.width=Math.round(width*dpr);
+  viewCanvas.height=Math.round(height*dpr);
+  viewContext.setTransform(dpr,0,0,dpr,0,0);
+}
+function getCanvasLocation(){
+  const rect=catalog.getBoundingClientRect();
+  const extra=Math.max(0,Math.min(catalog.clientHeight-surfaceHeight,-rect.top));
   return {
-    start:Math.min(model.length-1,findRow(topPx)),
-    end:Math.min(model.length,findRow(topPx+height)+1)
+    origin:catalog.scrollTop+extra,
+    canvasOffset:catalog.scrollTop+extra
   };
 }
-function flushPendingRows(){
-  pendingFrame=0;
-  const began=performance.now();
-  let done=0;
-  const fragment=document.createDocumentFragment();
-  while(pendingWindowRows.length&&done<4&&(done===0||performance.now()-began<5)){
-    const task=pendingWindowRows.shift();
-    if(task.generation!==renderGeneration||activeNodes.has(task.index))continue;
-    const node=getRowNode(task.index);
-    activeNodes.set(task.index,node);
-    fragment.appendChild(node);
-    done++;
-  }
-  if(fragment.childNodes.length)layer.appendChild(fragment);
-  if(pendingWindowRows.length)pendingFrame=requestAnimationFrame(flushPendingRows);
+function drawRoundRect(ctx,x,y,w,h,r,fill,stroke){
+  if(w<=1||h<=1)return;
+  ctx.beginPath();
+  if(ctx.roundRect)ctx.roundRect(x+.5,y+.5,w-1,h-1,Math.min(r,w/2,h/2));
+  else ctx.rect(x+.5,y+.5,w-1,h-1);
+  if(fill){ctx.fillStyle=fill;ctx.fill();}
+  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke();}
 }
-function renderWindow(force=false){
-  windowFrame=0;
-  if(!model.length)return;
-  const visible=visibleRange();
-  // Avoid touching the DOM while the viewport remains within the cached band.
-  if(!force&&visible.start>=rangeStart+2&&visible.end<=rangeEnd-2)return;
-  const nextStart=Math.max(0,visible.start-OVERSCAN);
-  const nextEnd=Math.min(model.length,visible.end+OVERSCAN);
-  if(!force&&nextStart===rangeStart&&nextEnd===rangeEnd)return;
-  cancelRowWork();
-  rangeStart=nextStart;rangeEnd=nextEnd;
-  for(const [index,node] of activeNodes){
-    if(index<nextStart||index>=nextEnd){
-      activeNodes.delete(index);
-      node.remove();
-      storeCachedRow(index,node);
+function themeColors(){
+  const style=getComputedStyle(document.documentElement);
+  const pane=getComputedStyle(catalog);
+  return {
+    background:pane.backgroundColor,
+    card:style.getPropertyValue('--emoji-card-bg').trim()||(isDark?'#222222':'#f8f9fa'),
+    border:style.getPropertyValue('--emoji-card-border').trim()||(isDark?'#353535':'#e9e9e9'),
+    hover:style.getPropertyValue('--emoji-card-hover').trim()||'#fff0e5',
+    hoverBorder:style.getPropertyValue('--emoji-card-hover-border').trim()||'#e8a171',
+    heading:style.getPropertyValue('--catalog-heading').trim()||(isDark?'#f1f1f1':'#30343b'),
+    muted:style.getPropertyValue('--catalog-subheading').trim()||(isDark?'#aaaaaa':'#8a9199')
+  };
+}
+function drawViewport(){
+  frameId=0;
+  if(!viewCanvas)return;
+  resizeSurface();
+  const loc=getCanvasLocation();
+  drawOrigin=loc.origin;
+  viewCanvas.style.transform='translate3d(0,'+loc.canvasOffset+'px,0)';
+  const t=performance.now(),ctx=viewContext;
+  const colors=themeColors();
+  ctx.clearRect(0,0,surfaceWidth,surfaceHeight);
+  ctx.fillStyle=colors.background;
+  ctx.fillRect(0,0,surfaceWidth,surfaceHeight);
+  if(!model.length){
+    ctx.textAlign='center';
+    ctx.fillStyle=colors.heading;ctx.font='bold 18px Arial,sans-serif';
+    ctx.fillText(term?'Ничего не найдено':'Загрузка эмодзи...',surfaceWidth/2,surfaceHeight/2);
+    return;
+  }
+  const start=Math.max(0,findRow(drawOrigin));
+  const end=Math.min(model.length,findRow(drawOrigin+surfaceHeight)+1);
+  const pad=window.innerWidth<680?7:12;
+  const usableWidth=surfaceWidth-pad*2;
+  const cardWidth=Math.max(2,(usableWidth-(effectiveColumns-1)*gap)/effectiveColumns);
+  const glyphSize=fontSize*(ATLAS_TILE/ATLAS_GLYPH);
+  let visibleIcons=0;
+  for(let r=start;r<end;r++){
+    const record=model[r];
+    const y=positions[r]-drawOrigin;
+    if(record.kind==='header'){
+      ctx.textBaseline='middle';ctx.textAlign='left';
+      ctx.font='21px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",emoji,sans-serif';
+      ctx.fillText(record.icon,pad+2,y+22);
+      ctx.font='700 16px Arial,sans-serif';ctx.fillStyle=colors.heading;
+      ctx.fillText(record.label,pad+34,y+22);
+      ctx.font='12px Arial,sans-serif';ctx.fillStyle=colors.muted;ctx.textAlign='right';
+      ctx.fillText(record.count+' эмодзи',surfaceWidth-pad-4,y+22);
+    }else{
+      for(let c=0;c<record.items.length;c++){
+        const e=record.items[c];
+        const x=pad+c*(cardWidth+gap);
+        const active=hoveredItem===e;
+        if(!hideFrames||active){
+          const fill=active?colors.hover:(hideFrames?null:colors.card);
+          const stroke=hideFrames?null:(active?colors.hoverBorder:colors.border);
+          drawRoundRect(ctx,x,y,cardWidth,cellHeight,9,fill,stroke);
+        }
+        const outX=x+(cardWidth-glyphSize)/2;
+        const outY=y+(cellHeight-glyphSize)/2;
+        if(spriteAtlas){
+          const index=e.atlasIndex;
+          ctx.drawImage(spriteAtlas,(index%ATLAS_COLS)*ATLAS_TILE,Math.floor(index/ATLAS_COLS)*ATLAS_TILE,
+             ATLAS_TILE,ATLAS_TILE,outX,outY,glyphSize,glyphSize);
+        }
+        visibleIcons++;
+      }
     }
   }
-  const tasks=[];
-  // Visible rows first, prefetch nearest outside rows in later frames.
-  for(let i=visible.start;i<visible.end;i++)if(!activeNodes.has(i))tasks.push(i);
-  for(let d=1;d<=OVERSCAN;d++){
-    const a=visible.start-d,b=visible.end+d-1;
-    if(a>=nextStart&&!activeNodes.has(a))tasks.push(a);
-    if(b<nextEnd&&!activeNodes.has(b))tasks.push(b);
-  }
-  const generation=renderGeneration;
-  pendingWindowRows=tasks.map(index=>({index,generation}));
-  if(pendingWindowRows.length)pendingFrame=requestAnimationFrame(flushPendingRows);
-  if(!term){
+  lastDrawMetrics={rows:end-start,icons:visibleIcons,ms:performance.now()-t};
+  if(!term&&model.length){
     let group='';
-    for(let i=visible.start;i>=0;i--){
-      if(model[i].kind==='header'){group=model[i].id;break}
-    }
-    if(group!==currentNavTab){
-      currentNavTab=group;
-      updateActiveTab(group);
-    }
+    for(let i=start;i>=0;i--){if(model[i].kind==='header'){group=model[i].id;break}}
+    if(group&&currentNavTab!==group){currentNavTab=group;updateActiveTab(group)}
   }
 }
 function scheduleWindow(){
-  if(!windowFrame)windowFrame=requestAnimationFrame(()=>renderWindow());
+  if(!frameId)frameId=requestAnimationFrame(drawViewport);
+}
+function hitTest(event){
+  if(!viewCanvas||!model.length)return null;
+  const bounds=viewCanvas.getBoundingClientRect();
+  const x=event.clientX-bounds.left,y=event.clientY-bounds.top;
+  if(x<0||x>=surfaceWidth||y<0||y>=surfaceHeight)return null;
+  const coordinate=drawOrigin+y;
+  const rowId=findRow(coordinate);
+  const record=model[rowId];
+  if(!record||record.kind!=='emojis'||coordinate-positions[rowId]>cellHeight)return null;
+  const pad=window.innerWidth<680?7:12;
+  const width=surfaceWidth-pad*2;
+  const itemWidth=Math.max(2,(width-(effectiveColumns-1)*gap)/effectiveColumns);
+  const dx=x-pad;if(dx<0)return null;
+  const column=Math.floor(dx/(itemWidth+gap));
+  if(column<0||column>=record.items.length||dx-column*(itemWidth+gap)>itemWidth)return null;
+  return record.items[column];
+}
+function onPointerHover(event){
+  const item=hitTest(event);
+  if(item===hoveredItem)return;
+  hoveredItem=item;
+  viewCanvas.style.cursor=item?'pointer':'default';
+  viewCanvas.title=item?item.name+' — копировать':'';
+  scheduleWindow();
+}
+function cancelRowWork(){}
+function refreshContent(resetScroll=true){
+  if(resetScroll)catalog.scrollTop=0;
+  hoveredItem=null;
+  rebuildRows();
+  ensureCanvas();
+  scheduleWindow();
 }
 catalog.addEventListener('scroll',scheduleWindow,{passive:true});
 window.addEventListener('scroll',scheduleWindow,{passive:true});
-function refreshContent(resetScroll=true){
-  clearRowCache();
-  if(resetScroll)catalog.scrollTop=0;
-  rebuildRows();
-  if(model.length)layer.replaceChildren();
-  renderWindow(true);
-}
 function refreshGrid(preservePosition=false){
   const previousTotal=positions[positions.length-1]||1;
   const ratio=preservePosition?catalog.scrollTop/previousTotal:0;
@@ -551,10 +628,6 @@ async function copy(native){
   toast(native+' · '+(nativeData.get(native)?.name||'Эмодзи')+' — скопировано');
   // Keep all rendered rows intact on copy. Recent history rebuilds on next search/nav.
 }
-layer.addEventListener('click',e=>{
-  const button=e.target.closest('[data-emoji]');
-  if(button)copy(button.dataset.emoji);
-});
 el('reset').addEventListener('click',()=>{
   history=[];try{localStorage.removeItem(historyKey)}catch(e){}
   if(!term)refreshContent(false);
@@ -631,7 +704,7 @@ function applyBackground(){
   hexField.value=displayed.toUpperCase();
   nativePicker.value=displayed.toLowerCase();
   hueSlider.value=String(Math.round(hue));
-  renderPalette();
+  renderPalette();scheduleWindow();
 }
 function persistColor(){
   customBackground=currentHex();
@@ -702,12 +775,14 @@ fetch('./emoji-data.json').then(r=>{if(!r.ok)throw Error('HTTP '+r.status);retur
   }));
   categoryData=new Map(groups.map(g=>[g.id,[]]));
   for(const entry of entries){categoryData.get(entry.cat)?.push(entry);nativeData.set(entry.native,entry)}
+  // One-time preparation; no emoji rasterization or loading while scrolling.
+  makeAtlas();
   term=normalize(search.value);
   refreshContent();
 }).catch(err=>{
   el('count').textContent='Ошибка загрузки эмодзи';
-  layer.style.height='auto';
-  layer.innerHTML='<div class="empty"><strong>Не удалось загрузить каталог</strong>Обнови страницу и попробуй ещё раз.</div>';
+  ensureCanvas();
+  scheduleWindow();
   console.error(err);
 });
 </script>
