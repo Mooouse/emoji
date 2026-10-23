@@ -1,0 +1,20 @@
+# Emoji — каталог эмодзи
+
+Русскоязычный каталог из **1870 эмодзи**, доступный по адресу: https://mooouse.github.io/emoji/
+
+## Возможности
+- Поиск по русским названиям и ключевым словам, а также по английским именам.
+- Копирование эмодзи одним нажатием без перерисовки всей сетки.
+- Просмотр по категориям с дозагрузкой порциями.
+- Два ползунка: количество колонок и размер эмодзи. Сетка адаптируется под ширину экрана.
+- Светлая и чёрная темы, запоминание настроек и недавно использованных эмодзи.
+- Статический HTML/CSS/JS — без серверной части, трекеров и рекламных блоков.
+
+## Публикация
+Ветка `main` развёртывается через GitHub Actions (`.github/workflows/pages.yml`). В Settings → Pages → Build and deployment источник должен быть **GitHub Actions**.
+
+## Данные и лицензии
+- Русские названия и ключевые слова: [Unicode CLDR, Russian emoji annotations](https://github.com/unicode-org/cldr/tree/main/common/annotations) и [Derived annotations](https://github.com/unicode-org/cldr/tree/main/common/annotationsDerived). © Unicode, Inc.; [Unicode License v3](https://www.unicode.org/license.txt).
+- Первоначальный список/порядок эмодзи основан на [Emoji Mart data](https://github.com/missive/emoji-mart) (MIT).
+
+В каталоге сохранены английские имена как дополнительные поисковые термины.
