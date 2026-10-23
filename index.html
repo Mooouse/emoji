@@ -94,13 +94,48 @@ html.dark .border-toggle strong{background:#243a29;color:#a3d8a7}
 html.dark .border-toggle[aria-pressed="true"] strong{background:#513323;color:#ffd0a6}
 @media(max-width:390px){.grid-popover{right:-58px;width:min(350px,calc(100vw - 18px));padding:14px}}
 
+
+/* Grid control arrow and Photoshop-style background palette */
+#grid-toggle{display:inline-flex;align-items:center;justify-content:center;gap:7px;line-height:1.1}
+.grid-chevron{display:block;flex-shrink:0;width:16px;height:16px;align-self:center;transition:transform .15s ease}
+#grid-toggle[aria-expanded="true"] .grid-chevron{transform:rotate(180deg)}
+.grid-popover{max-height:min(82vh,740px);overflow-y:auto}
+.palette-section{border-top:1px solid #ebeef0;padding-top:14px}
+.palette-heading{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700;color:#555d66;margin-bottom:10px}
+.palette-preview{width:30px;height:23px;border:1px solid #d2d6da;border-radius:6px;background:#fff}
+.palette-picker{position:relative;height:156px;touch-action:none;border-radius:9px;overflow:hidden;border:1px solid #dfe2e5}
+#sv-palette{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
+.palette-cursor{position:absolute;left:100%;top:0;width:13px;height:13px;border:2px solid white;border-radius:50%;box-shadow:0 0 0 1px #0008,0 2px 4px #0004;transform:translate(-50%,-50%);pointer-events:none}
+.palette-hue-label{font-size:12px;color:#727980;display:block;margin:11px 0 6px}
+.hue-slider{appearance:none;-webkit-appearance:none;display:block;width:100%;height:13px;border-radius:10px;background:linear-gradient(to right,red,#ff0,lime,cyan,blue,magenta,red);cursor:pointer}
+.hue-slider::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:15px;height:22px;border:2px solid white;box-shadow:0 1px 4px #0008;border-radius:6px;background:transparent}
+.hue-slider::-moz-range-thumb{width:12px;height:19px;border:2px solid white;box-shadow:0 1px 4px #0008;border-radius:6px;background:transparent}
+.palette-bottom{display:flex;gap:7px;align-items:center;margin-top:14px}
+.palette-bottom label{font-size:12px;color:#7a8189}
+.hex-input{width:88px;min-width:0;border:1px solid #dfe2e5;border-radius:7px;padding:8px;font-size:13px;text-transform:uppercase;background:white;color:#222}
+#native-picker{width:33px;height:33px;padding:2px;background:transparent;border:1px solid #dfe2e5;border-radius:7px;cursor:pointer}
+#reset-background{margin-left:auto;border:1px solid #e1e4e7;border-radius:7px;background:#f8f9fa;color:#505760;padding:8px;font-size:12px;cursor:pointer}
+.palette-hint{color:#9aa0a6;font-size:11px;margin:9px 0 0}
+.catalog{background:var(--catalog-background,#fff)}
+html.dark .catalog{background:var(--catalog-background,#141414)}
+.virtual-row.heading{color:var(--catalog-heading,#2f343b)}
+html.dark .virtual-row.heading{color:var(--catalog-heading,#f1f1f1)}
+.virtual-row.heading .muted,html.dark .virtual-row.heading .muted{color:var(--catalog-subheading,#999)}
+.virtual-row.emoji-line{content-visibility:auto;contain-intrinsic-size:auto var(--emoji-cell);contain:layout paint style}
+html.dark .palette-section{border-color:#383838}
+html.dark .palette-heading,html.dark .palette-hue-label,html.dark .palette-bottom label{color:#d0d0d0}
+html.dark .hex-input{background:#171717;border-color:#454545;color:#f2f2f2}
+html.dark #native-picker,html.dark #reset-background{border-color:#414141}
+html.dark #reset-background{background:#272727;color:#dedede}
+html.dark .palette-picker{border-color:#4a4a4a}
+
 </style></head>
 <body>
 <header class="top"><div class="topin"><a href="./" class="logo">emoji<span>.</span></a>
 <div class="settings">
 <span class="topright">Копируй любимые эмодзи одним нажатием</span>
 <div class="grid-menu" id="grid-menu">
-<button type="button" id="grid-toggle" class="tool-button" aria-expanded="false" aria-controls="grid-popover" aria-haspopup="true">⚙️ Сетка <span aria-hidden="true">⌄</span></button>
+<button type="button" id="grid-toggle" class="tool-button" aria-expanded="false" aria-controls="grid-popover" aria-haspopup="true">⚙️ Сетка <svg class="grid-chevron" aria-hidden="true" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 7.5 5 5 5-5"/></svg></button>
 <div id="grid-popover" class="grid-popover" hidden>
 <div class="popup-header">Настройка сетки</div>
 <p class="popup-hint">Выбери, сколько эмодзи помещается по ширине и высоте.</p>
@@ -108,6 +143,14 @@ html.dark .border-toggle[aria-pressed="true"] strong{background:#513323;color:#f
 <div class="slider-field"><label class="slider-head" for="rows">Строк видно <output id="rows-value">9</output></label><div class="slider-control"><input id="rows" type="range" min="1" max="20" value="9" step="1"><input class="slider-number" id="rows-number" type="number" min="1" max="80" step="1" value="9" inputmode="numeric" aria-label="Указать точное количество строк"></div></div>
 <div class="slider-field"><label class="slider-head" for="emoji-size">Размер эмодзи <output id="size-value">33 px</output></label><div class="slider-control"><input id="emoji-size" type="range" min="12" max="50" value="33" step="1"><input class="slider-number" id="emoji-size-number" type="number" min="12" max="96" step="1" value="33" inputmode="numeric" aria-label="Указать точный размер эмодзи в пикселях"></div></div>
 <button type="button" id="border-toggle" class="border-toggle" aria-pressed="false"><span>Рамки эмодзи</span><strong id="border-state">Включены</strong></button>
+<div class="palette-section">
+<div class="palette-heading"><label for="catalog-hex">Цвет фона блока</label><span id="color-preview" class="palette-preview" aria-hidden="true"></span></div>
+<div class="palette-picker"><canvas id="sv-palette" width="272" height="156" aria-label="Выбор насыщенности и яркости цвета" tabindex="0"></canvas><span id="palette-cursor" class="palette-cursor" aria-hidden="true"></span></div>
+<label class="palette-hue-label" for="hue-slider">Оттенок</label>
+<input id="hue-slider" class="hue-slider" type="range" min="0" max="360" value="25" aria-label="Оттенок цвета">
+<div class="palette-bottom"><label for="catalog-hex">HEX</label><input id="catalog-hex" class="hex-input" type="text" maxlength="7" spellcheck="false" value="#FFFFFF" aria-label="Шестнадцатеричный код цвета"><input id="native-picker" type="color" value="#ffffff" aria-label="Открыть системную палитру"><button id="reset-background" type="button">Сбросить</button></div>
+<p class="palette-hint">Цвет сохранится после перезагрузки страницы.</p>
+</div>
 <div class="popup-foot">Все эмодзи доступны прокруткой. Настройки сохраняются автоматически.</div>
 </div></div>
 <button type="button" class="tool-button" id="theme" aria-label="Переключить тему">🌙</button></div></div></header>
