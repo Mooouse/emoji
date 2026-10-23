@@ -1,61 +1,76 @@
-const assert = require('node:assert/strict');
-const { spawn } = require('node:child_process');
-const puppeteer = require('puppeteer-core');
-
-const sleep = ms => new Promise(resolve=>setTimeout(resolve,ms));
-(async () => {
-  const server = spawn('python3',['-m','http.server','8765','--bind','127.0.0.1'],{stdio:'ignore'});
+const assert=require('node:assert/strict');
+const {spawn}=require('node:child_process');
+const puppeteer=require('puppeteer-core');
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+(async()=>{
+  const server=spawn('python3',['-m','http.server','8765','--bind','127.0.0.1'],{stdio:'ignore'});
   let browser;
   try{
-    let ok=false;
+    let ready=false;
     for(let i=0;i<40;i++){
-      try{const r=await fetch('http://127.0.0.1:8765/index.html');if(r.ok){ok=true;break}}catch(e){}
+      try{const r=await fetch('http://127.0.0.1:8765/index.html');if(r.ok){ready=true;break}}catch(e){}
       await sleep(150);
     }
-    assert(ok,'Local web server did not start');
-    const executable = process.env.CHROME_PATH || '/usr/bin/google-chrome';
-    browser = await puppeteer.launch({headless:true,executablePath:executable,args:['--no-sandbox','--disable-dev-shm-usage']});
+    assert(ready,'Local test server failed to start');
+    browser=await puppeteer.launch({headless:true,executablePath:process.env.CHROME_PATH||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
     const page=await browser.newPage();
     await page.setViewport({width:1440,height:900,deviceScaleFactor:1});
     const errors=[];
-    page.on('pageerror',e=>errors.push(e.message));
+    page.on('pageerror',error=>errors.push(error.message));
+    page.on('console',m=>{if(m.type()==='error')errors.push('console: '+m.text());else if(m.text().includes('[emoji]'))console.log(m.text())});
     await page.goto('http://127.0.0.1:8765/',{waitUntil:'networkidle0'});
-    await page.waitForFunction(()=>document.querySelectorAll('.emoji').length>0,{timeout:10000});
+    await page.waitForFunction(()=>document.querySelector('#emoji-viewport')?.width>0&&document.querySelector('#count').textContent.includes('1870'),{timeout:20000});
+    await sleep(150);
     let state=await page.evaluate(()=>({
-      count:document.querySelectorAll('.emoji').length,
-      fullHeight:document.getElementById('catalog').scrollHeight,
-      viewport:document.getElementById('catalog').clientHeight,
-      searchPlaceholder:document.querySelector('#search').placeholder
+      atlas:!!spriteAtlas,atlasSize:spriteAtlas?[spriteAtlas.width,spriteAtlas.height]:[],
+      atlasMs:Math.round(atlasMs),painted:lastDrawMetrics,
+      domEmojiButtons:document.querySelectorAll('.emoji').length,
+      fullHeight:document.querySelector('#catalog').scrollHeight,
+      viewport:document.querySelector('#catalog').clientHeight,
+      canvas:!!document.querySelector('#emoji-viewport')
     }));
     console.log('initial',state);
-    assert(state.count>0&&state.count<600,'Too many emojis mounted at once, virtualization may be broken');
-    assert(state.fullHeight>state.viewport,'Missing complete scrolling height');
-    await page.evaluate(()=>{const p=document.querySelector('#catalog');p.scrollTop=p.scrollHeight*.72});
-    await sleep(450);
-    state=await page.evaluate(()=>({count:document.querySelectorAll('.emoji').length,top:document.querySelector('#catalog').scrollTop}));
-    console.log('scroll',state);
-    assert(state.count>0&&state.count<600,'Scroll failed to window emoji DOM');
+    assert(state.atlas,'Emoji texture atlas failed to generate');
+    assert(state.domEmojiButtons===0,'Emoji DOM glyphs still exist');
+    assert(state.fullHeight>state.viewport,'Not all emojis are reachable by scrolling');
+    assert(state.painted.icons>0,'Canvas did not draw emoji sprites');
+    for(let i=1;i<=14;i++){
+      await page.evaluate(i=>{
+        const catalog=document.querySelector('#catalog');
+        catalog.scrollTop=(catalog.scrollHeight-catalog.clientHeight)*i/14;
+      },i);
+      await sleep(55);
+    }
+    state=await page.evaluate(()=>({
+      scrollTop:document.querySelector('#catalog').scrollTop,
+      frame:lastDrawMetrics,
+      domButtons:document.querySelectorAll('.emoji').length
+    }));
+    console.log('after fast scroll',state);
+    assert(state.frame.icons>0,'Icons did not draw at the end of scrolling');
+    assert.equal(state.domButtons,0,'Scrolling reconstructed emoji buttons');
     await page.locator('#search').fill('сердце');
-    await sleep(650);
-    state=await page.evaluate(()=>({found:document.querySelector('#count').textContent,visible:document.querySelectorAll('.emoji').length}));
+    await sleep(280);
+    state=await page.evaluate(()=>({text:document.querySelector('#count').textContent,frame:lastDrawMetrics}));
     console.log('search',state);
-    assert(state.found.includes('Найдено:')&&state.visible>0,'Russian search returned no rendered emojis');
+    assert(state.text.includes('Найдено: 29'),'Russian search failed');
+    assert(state.frame.icons>0,'Search icons did not render');
     await page.locator('#grid-toggle').click();
     await page.locator('#catalog-hex').fill('#123456');
     await page.keyboard.press('Tab');
-    await sleep(100);
+    await sleep(90);
     const colors=await page.evaluate(()=>({
-      catalog:getComputedStyle(document.getElementById('catalog')).backgroundColor,
-      card:getComputedStyle(document.querySelector('.emoji')).backgroundColor,
-      border:getComputedStyle(document.querySelector('.emoji')).borderColor
+      background:getComputedStyle(document.querySelector('#catalog')).backgroundColor,
+      card:getComputedStyle(document.documentElement).getPropertyValue('--emoji-card-bg').trim(),
+      border:getComputedStyle(document.documentElement).getPropertyValue('--emoji-card-border').trim()
     }));
-    console.log('colors',colors);
-    assert.equal(colors.catalog,'rgb(18, 52, 86)','Custom background did not apply');
-    assert.notEqual(colors.card,'rgb(248, 249, 250)','Card did not adapt to background');
-    assert(!errors.length,'JavaScript errors: '+errors.join('; '));
-    console.log('All emoji site browser smoke tests passed.');
+    console.log('color controls',colors);
+    assert.equal(colors.background,'rgb(18, 52, 86)');
+    assert(colors.card.startsWith('#')&&colors.border.startsWith('#'));
+    assert(!errors.length,'JavaScript browser errors: '+errors.join(' | '));
+    console.log('Native emoji atlas and instant canvas scrolling: browser tests PASSED');
   }finally{
     if(browser)await browser.close();
     server.kill();
   }
-})().catch(err=>{console.error(err);process.exitCode=1});
+})().catch(e=>{console.error(e);process.exitCode=1});
