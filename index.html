@@ -138,6 +138,23 @@ html.dark .palette-picker{border-color:#4a4a4a}
 }
 .emoji{transition:none;will-change:auto}
 
+
+/* Card colors follow the currently selected panel background, in both themes. */
+.catalog .emoji,html.dark .catalog .emoji{
+  background:var(--emoji-card-bg,#f8f9fa);
+  border:1px solid var(--emoji-card-border,#ebeef0);
+}
+.catalog .emoji:hover,html.dark .catalog .emoji:hover{
+  background:var(--emoji-card-hover,#fff0e5);
+  border-color:var(--emoji-card-hover-border,#eeb890);
+}
+html.no-emoji-frames .catalog .emoji,html.dark.no-emoji-frames .catalog .emoji{
+  border:0;background:transparent;
+}
+html.no-emoji-frames .catalog .emoji:hover,html.dark.no-emoji-frames .catalog .emoji:hover{
+  border:0;background:var(--emoji-card-hover,#fff0e5);
+}
+
 </style></head>
 <body>
 <header class="top"><div class="topin"><a href="./" class="logo">emoji<span>.</span></a>
@@ -585,8 +602,20 @@ function backgroundIsDark(hex){
   const converted=values.map(n=>n<=.04045?n/12.92:Math.pow((n+.055)/1.055,2.4));
   return converted[0]*.2126+converted[1]*.7152+converted[2]*.0722<.25;
 }
+function mixWith(rgbHexColor, mixTarget, proportion){
+  const a=rgbHexColor.slice(1).match(/.{2}/g).map(v=>parseInt(v,16));
+  const b=mixTarget.slice(1).match(/.{2}/g).map(v=>parseInt(v,16));
+  return rgbHex(...a.map((v,i)=>v*(1-proportion)+b[i]*proportion));
+}
 function applyBackground(){
   const root=document.documentElement;
+  const effectiveBackground=customBackground||(isDark?'#141414':'#FFFFFF');
+  const darkBackground=backgroundIsDark(effectiveBackground);
+  const contrast=darkBackground?'#FFFFFF':'#000000';
+  root.style.setProperty('--emoji-card-bg',mixWith(effectiveBackground,contrast,darkBackground?.075:.038));
+  root.style.setProperty('--emoji-card-border',mixWith(effectiveBackground,contrast,darkBackground?.19:.10));
+  root.style.setProperty('--emoji-card-hover',mixWith(effectiveBackground,'#F7A769',darkBackground?.23:.17));
+  root.style.setProperty('--emoji-card-hover-border',mixWith(effectiveBackground,'#E78A44',.48));
   if(customBackground){
     root.style.setProperty('--catalog-background',customBackground);
     const dark=backgroundIsDark(customBackground);
