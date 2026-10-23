@@ -553,7 +553,12 @@ el('reset-background').addEventListener('click',()=>{
 });
 try{
   const saved=localStorage.getItem('emoji_catalog_color');
-  if(!saved||!setHex(saved,false))applyBackground();
+  if(!saved||!setHex(saved,false)){
+    const defaultHex=isDark?'#141414':'#FFFFFF';
+    const [r,g,b]=defaultHex.slice(1).match(/.{2}/g).map(n=>parseInt(n,16));
+    [hue,saturation,brightness]=rgbHsv(r,g,b);
+    applyBackground();
+  }
 }catch(e){applyBackground()}
 
 nav();updateDimensions();
