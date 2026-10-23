@@ -495,7 +495,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
       assert(early.preload,'Emoji JSON did not get early preload priority');
       await startup.evaluate(()=>{
         const c=document.querySelector('#catalog');
-        c.scrollTop=c.scrollHeight-c.clientHeight;
+        c.scrollTop=(c.scrollHeight-c.clientHeight)*0.62;
       });
       await startup.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
       const scrolled=await startup.evaluate(()=>{
@@ -505,13 +505,16 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
         for(let i=start;i<end;i++)if(model[i].kind==='emojis')visible.push(...model[i].items);
         return {
           icons:lastDrawMetrics.icons,
-          ready:visible.every(item=>atlasPainted[item.atlasIndex]===1),
+          ready:visible.every(item=>(item.flagIndex>=0&&!!flagAtlasImage)||atlasPainted[item.atlasIndex]===1),
           totalPrepared:atlasReadyCount,
-          warmed:atlasWarmCursor
+          warmed:atlasWarmCursor,
+          nativeVisible:visible.filter(item=>item.flagIndex<0).length
         };
       });
       console.log('uncached last-page scroll',scrolled);
       assert(scrolled.icons>0&&scrolled.ready,'Fast scroll showed blank emoji while idle work was blocked');
+      assert(scrolled.nativeVisible>0,'Probe needs an uncached non-flag category');
+      assert(scrolled.totalPrepared>early.atlasPainted,'Fast scroll did not prepare its new visible sprites');
       assert(scrolled.totalPrepared<early.total,'Scrolling forced the entire sprite atlas to generate');
     }finally{
       await startup.close();
