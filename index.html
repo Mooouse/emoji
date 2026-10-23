@@ -345,6 +345,13 @@ html.watermark-paused body::before,html.watermark-paused body::after{animation-p
 </main>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script>
+// Service worker caches the page and emoji JSON between visits. Register
+// asynchronously so it never delays the first visible emojis.
+function registerEmojiCacheWorker(){
+  if(!('serviceWorker' in navigator))return;
+  navigator.serviceWorker.register('./sw.js',{scope:'./'})
+    .catch(error=>console.warn('[emoji] Offline cache registration unavailable:',error));
+}
 const groups=[{id:'people',icon:'😀',name:'Смайлики и люди'},{id:'nature',icon:'🐶',name:'Животные и природа'},{id:'foods',icon:'🥭',name:'Еда и напитки'},{id:'activity',icon:'⚽',name:'Действия'},{id:'places',icon:'🏖️',name:'Путешествия и места'},{id:'objects',icon:'🕯️',name:'Объекты'},{id:'symbols',icon:'⭕',name:'Символы'},{id:'flags',icon:'🚩',name:'Флаги'}];
 const el=id=>document.getElementById(id);
 const catalog=el('catalog'),layer=el('virtual-layer'),search=el('search'),menu=el('grid-popover'),menuToggle=el('grid-toggle');
@@ -713,6 +720,8 @@ let viewCanvas=null,viewContext=null;
 let surfaceWidth=0,surfaceHeight=0,surfaceDpr=1,drawOrigin=0;
 let frameId=0,atlasMs=0,atlasReadyCount=0,atlasWarmCursor=0,atlasWarmScheduled=false;
 let atlasContext=null,atlasPainted=null,firstEmojiPaintMs=0;
+let atlasRestorePending=false,atlasRestored=false,atlasPersistScheduled=false,atlasCacheSaved=false;
+let atlasCacheUrl='',atlasCacheWrites=0;
 let hoveredItem=null,keyboardIndex=-1,currentNavTab='';
 let hoverIndicator=null,hoverTooltip=null,surfaceRoot=null,canvasRenderCount=0;
 let lastDrawMetrics={rows:0,icons:0,ms:0};
@@ -722,6 +731,68 @@ let lastDrawMetrics={rows:0,icons:0,ms:0};
  * An idle-time warmer prepares everything else gradually; fast scrolling to
  * any unprepared row paints its glyphs on demand without blank placeholders.
  */
+// The atlas only matches the same emoji ordering, sprite parameters and
+// browser's installed emoji fonts. A different browser/OS uses its own copy.
+function makeAtlasCacheKey(){
+  let hash=2166136261;
+  const part=text=>{
+    for(const point of text)hash=Math.imul(hash^point.codePointAt(0),16777619);
+  };
+  part('v1-'+ATLAS_TILE+'-'+ATLAS_GLYPH+'-'+EMOJI_FONT+'-'+navigator.userAgent);
+  for(const entry of entries)part(entry.native);
+  return new URL('./.emoji-cache/native-'+(hash>>>0).toString(16)+'.png',location.href).href;
+}
+async function loadAtlasFromCache(){
+  if(!('caches' in window)||!('createImageBitmap' in window)){
+    atlasRestorePending=false;return;
+  }
+  try{
+    const cache=await caches.open('emoji-native-atlas-v1');
+    const matched=await cache.match(atlasCacheUrl);
+    if(!matched)return;
+    const blob=await matched.blob();
+    const bitmap=await createImageBitmap(blob);
+    if(bitmap.width!==spriteAtlas.width||bitmap.height!==spriteAtlas.height){
+      bitmap.close();return;
+    }
+    atlasContext.drawImage(bitmap,0,0);
+    bitmap.close();
+    atlasPainted.fill(1);
+    atlasReadyCount=entries.length;
+    atlasWarmCursor=entries.length;
+    atlasRestored=true;
+    atlasCacheSaved=true;
+    console.info('[emoji] Reused '+atlasReadyCount+' cached emoji textures from the previous visit.');
+    renderRecent();
+    scheduleWindow();
+  }catch(error){
+    console.warn('[emoji] Native atlas cache could not be restored:',error);
+  }finally{
+    atlasRestorePending=false;
+    if(!atlasRestored&&atlasReadyCount===entries.length)scheduleAtlasPersist();
+  }
+}
+function scheduleAtlasPersist(){
+  if(!('caches' in window)||atlasPersistScheduled||atlasCacheSaved||atlasRestorePending||
+     atlasReadyCount!==entries.length)return;
+  atlasPersistScheduled=true;
+  const save=()=>{
+    // PNG is lossless, preserving the exact shape of each native color emoji.
+    spriteAtlas.toBlob(async blob=>{
+      if(!blob){atlasPersistScheduled=false;return}
+      try{
+        const cache=await caches.open('emoji-native-atlas-v1');
+        await cache.put(atlasCacheUrl,new Response(blob,{headers:{'Content-Type':'image/png'}}));
+        atlasCacheSaved=true;atlasCacheWrites++;
+        console.info('[emoji] Cached all '+atlasReadyCount+' native emoji textures for next visits.');
+      }catch(error){
+        console.warn('[emoji] Atlas cache is unavailable:',error);
+      }finally{atlasPersistScheduled=false}
+    },'image/png');
+  };
+  if(typeof requestIdleCallback==='function')requestIdleCallback(save,{timeout:2500});
+  else setTimeout(save,100);
+}
 function paintAtlasEntry(e){
   if(!spriteAtlas||!e||atlasPainted[e.atlasIndex])return;
   const index=e.atlasIndex,g=atlasContext;
@@ -751,7 +822,10 @@ function warmAtlasStep(deadline){
     count++;
   }
   if(atlasReadyCount<entries.length&&atlasWarmCursor<entries.length)scheduleAtlasWarmup();
-  else console.info('[emoji] Prepared all '+atlasReadyCount+' emoji textures in '+Math.round(atlasMs)+' ms (incremental).');
+  else{
+    console.info('[emoji] Prepared all '+atlasReadyCount+' emoji textures in '+Math.round(atlasMs)+' ms (incremental).');
+    scheduleAtlasPersist();
+  }
 }
 function scheduleAtlasWarmup(){
   if(atlasWarmScheduled||!spriteAtlas||atlasReadyCount===entries.length)return;
@@ -778,6 +852,9 @@ function makeAtlas(){
   atlasPainted=new Uint8Array(entries.length);
   atlasReadyCount=0;atlasWarmCursor=0;atlasMs=performance.now()-began;
   spriteAtlas=atlas;
+  atlasCacheUrl=makeAtlasCacheKey();
+  atlasRestorePending=true;
+  void loadAtlasFromCache();
   console.info('[emoji] Atlas allocated in '+Math.round(atlasMs)+' ms; visible emoji render first.');
 }
 function ensureCanvas(){
@@ -935,6 +1012,7 @@ function drawViewport(){
     requestAnimationFrame(()=>{
       startFlagAtlas();
       scheduleAtlasWarmup();
+      registerEmojiCacheWorker();
     });
   }
   if(!term&&model.length){
