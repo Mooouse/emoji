@@ -530,7 +530,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     const cacheSnapshot=await page.evaluate(async()=>{
       const atlas=await caches.open('emoji-native-atlas-v1');
       const entry=await atlas.match(atlasCacheUrl);
-      const assets=await caches.open('emoji-site-v2-assets');
+      const assets=await caches.open('emoji-site-v3-assets');
       const json=await assets.match('./emoji-data.json');
       const index=await assets.match('./index.html');
       const flags=await assets.match('./flag-atlas.png');
@@ -542,6 +542,13 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
         flagsCached:!!flags
       };
     });
+    const faviconCheck=await page.evaluate(async()=>{
+      const data=await (await fetch('./favicon.svg?v=4')).text();
+      return {redEnvelope:data.includes('🧧'),oldGalaxy:data.includes('🌌'),loveLetter:data.includes('💌')};
+    });
+    console.log('favicon icon',faviconCheck);
+    assert(faviconCheck.redEnvelope&&!faviconCheck.oldGalaxy&&!faviconCheck.loveLetter,
+      'Favicon is not the red envelope emoji');
     console.log('saved first-visit resources',cacheSnapshot);
     assert(cacheSnapshot.nativeAtlas&&cacheSnapshot.nativeBytes>10000,'No persisted native emoji atlas');
     assert(cacheSnapshot.dataCached&&cacheSnapshot.pageCached&&cacheSnapshot.flagsCached,
