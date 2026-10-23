@@ -227,34 +227,55 @@ body::before,body::after{
   content:"";
   position:fixed;
   /* Extra tile coverage on all sides prevents blank strips at motion bounds. */
-  top:-280px;bottom:-280px;left:-400px;right:-400px;
+  top:var(--watermark-neg-y,-280px);
+  bottom:var(--watermark-neg-y,-280px);
+  left:var(--watermark-neg-x,-400px);
+  right:var(--watermark-neg-x,-400px);
   z-index:0;
   pointer-events:none;
   background-repeat:repeat;
-  background-size:400px 280px;
+  background-size:var(--watermark-tile-x,400px) var(--watermark-tile-y,280px);
   background-position:center top;
   will-change:transform;
 }
 body::before{
   background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22280%22%20viewBox%3D%220%200%20400%20280%22%3E%3Cg%20fill%3D%22%23000000%22%20fill-opacity%3D%220.052%22%20font-family%3D%22Arial%2CHelvetica%2Csans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%20letter-spacing%3D%221%22%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(100%2070)%20rotate(-35)%22%3Ean4ous%3C%2Ftext%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(300%20210)%20rotate(-35)%22%3Eemoji%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E");
-  animation:an4ous-drift-left 140s linear infinite;
+  animation:an4ous-drift-left var(--watermark-duration,140s) linear infinite;
 }
 body::after{
   background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22280%22%20viewBox%3D%220%200%20400%20280%22%3E%3Cg%20fill%3D%22%23000000%22%20fill-opacity%3D%220.052%22%20font-family%3D%22Arial%2CHelvetica%2Csans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%20letter-spacing%3D%221%22%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(100%20210)%20rotate(-35)%22%3Eemoji%3C%2Ftext%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(300%2070)%20rotate(-35)%22%3Ean4ous%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E");
-  animation:an4ous-drift-right 140s linear infinite;
+  animation:an4ous-drift-right var(--watermark-duration,140s) linear infinite;
 }
 html.dark body::before{background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22280%22%20viewBox%3D%220%200%20400%20280%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.055%22%20font-family%3D%22Arial%2CHelvetica%2Csans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%20letter-spacing%3D%221%22%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(100%2070)%20rotate(-35)%22%3Ean4ous%3C%2Ftext%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(300%20210)%20rotate(-35)%22%3Eemoji%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E")}
 html.dark body::after{background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22280%22%20viewBox%3D%220%200%20400%20280%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.055%22%20font-family%3D%22Arial%2CHelvetica%2Csans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22800%22%20letter-spacing%3D%221%22%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(100%20210)%20rotate(-35)%22%3Eemoji%3C%2Ftext%3E%3Ctext%20x%3D%220%22%20y%3D%220%22%20text-anchor%3D%22middle%22%20transform%3D%22translate(300%2070)%20rotate(-35)%22%3Ean4ous%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E")}
 @keyframes an4ous-drift-left{
   from{transform:translate3d(0,0,0)}
-  to{transform:translate3d(-400px,280px,0)}
+  to{transform:translate3d(var(--watermark-neg-x,-400px),var(--watermark-tile-y,280px),0)}
 }
 @keyframes an4ous-drift-right{
   from{transform:translate3d(0,0,0)}
-  to{transform:translate3d(400px,-280px,0)}
+  to{transform:translate3d(var(--watermark-tile-x,400px),var(--watermark-neg-y,-280px),0)}
 }
 @media(prefers-reduced-motion:reduce){body::before,body::after{animation:none;will-change:auto}}
 
+
+/* Independent background-controls dropdown; never interferes with emoji scroll. */
+.watermark-popover{width:312px;text-align:left}
+.watermark-range{margin-top:18px;margin-bottom:17px}
+.watermark-range input[type="range"]{width:100%;accent-color:#ef9860}
+.watermark-range input[type="range"]:disabled{opacity:.4;cursor:not-allowed}
+.watermark-popover .popup-foot{margin:2px 0 0}
+#watermark-menu-toggle[aria-expanded="true"] .grid-chevron{transform:rotate(180deg)}
+.watermark-menu-icon{font-size:17px;line-height:1}
+html.watermark-off body::before,html.watermark-off body::after{display:none!important;animation:none!important;will-change:auto}
+@media(max-width:600px){
+  .watermark-menu-word{display:none}
+  #watermark-menu-toggle{gap:4px;padding-left:9px;padding-right:9px}
+  #grid-toggle{font-size:0;gap:4px}
+  #grid-toggle::before{content:"⚙️";font-size:17px;line-height:1}
+  #grid-toggle .grid-chevron,#watermark-menu-toggle .grid-chevron{width:12px}
+}
+@media(max-width:390px){.watermark-popover{right:-75px;width:min(312px,calc(100vw - 20px))}}
 </style></head>
 <body>
 <header class="top"><div class="topin"><a href="./" class="logo" aria-label="emoji.an4ous — главная">emoji<span>.</span>an4ous</a>
@@ -278,6 +299,16 @@ html.dark body::after{background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D
 <p class="palette-hint">Цвет сохранится после перезагрузки страницы.</p>
 </div>
 <div class="popup-foot">Все эмодзи доступны прокруткой. Настройки сохраняются автоматически.</div>
+</div></div>
+<div class="grid-menu background-menu" id="watermark-menu">
+<button type="button" class="tool-button" id="watermark-menu-toggle" aria-expanded="false" aria-controls="watermark-popover" aria-haspopup="true" aria-label="Настройки фоновых надписей"><span aria-hidden="true" class="watermark-menu-icon">✧</span><span class="watermark-menu-word">Фон</span><svg class="grid-chevron" aria-hidden="true" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 7.5 5 5 5-5"/></svg></button>
+<div id="watermark-popover" class="grid-popover watermark-popover" hidden>
+<div class="popup-header">Фоновые надписи</div>
+<p class="popup-hint">Настрой движение и размер an4ous / emoji.</p>
+<button type="button" id="watermark-toggle" class="border-toggle" aria-pressed="true"><span>Узор на фоне</span><strong id="watermark-state">Включён</strong></button>
+<div class="slider-field watermark-range"><label class="slider-head" for="watermark-speed">Скорость движения <output id="watermark-speed-value">1.0×</output></label><input type="range" id="watermark-speed" min="0.2" max="3" value="1" step="0.1" aria-label="Скорость движения фоновых надписей"></div>
+<div class="slider-field watermark-range"><label class="slider-head" for="watermark-size">Размер надписей <output id="watermark-size-value">28 px</output></label><input type="range" id="watermark-size" min="14" max="48" value="28" step="1" aria-label="Размер фоновых надписей"></div>
+<p class="popup-foot">Настройки сохраняются автоматически.</p>
 </div></div>
 <button type="button" class="tool-button" id="theme" aria-label="Переключить тему">🌙</button></div></div></header>
 <main class="shell">
@@ -352,16 +383,73 @@ el('border-toggle').addEventListener('click',()=>{
   applyFrames();scheduleWindow();
 });
 applyFrames();
+const watermarkMenu=el('watermark-popover'),watermarkMenuToggle=el('watermark-menu-toggle');
 function setMenu(open){
   menu.hidden=!open;menuToggle.setAttribute('aria-expanded',String(open));
+  if(open)setWatermarkMenu(false);
+}
+function setWatermarkMenu(open){
+  watermarkMenu.hidden=!open;
+  watermarkMenuToggle.setAttribute('aria-expanded',String(open));
+  if(open){menu.hidden=true;menuToggle.setAttribute('aria-expanded','false')}
 }
 menuToggle.addEventListener('click',()=>setMenu(menu.hidden));
+watermarkMenuToggle.addEventListener('click',()=>setWatermarkMenu(watermarkMenu.hidden));
 document.addEventListener('pointerdown',event=>{
   if(!el('grid-menu').contains(event.target))setMenu(false);
+  if(!el('watermark-menu').contains(event.target))setWatermarkMenu(false);
 });
 document.addEventListener('keydown',event=>{
-  if(event.key==='Escape'&&!menu.hidden){setMenu(false);menuToggle.focus()}
+  if(event.key!=='Escape')return;
+  if(!watermarkMenu.hidden){setWatermarkMenu(false);watermarkMenuToggle.focus()}
+  else if(!menu.hidden){setMenu(false);menuToggle.focus()}
 });
+let watermarkEnabled=true,watermarkSpeed=1,watermarkSize=28;
+try{
+  watermarkEnabled=localStorage.getItem('emoji_watermark_enabled')!=='false';
+  const storedSpeed=Number(localStorage.getItem('emoji_watermark_speed'));
+  const storedSize=Number(localStorage.getItem('emoji_watermark_size'));
+  if(Number.isFinite(storedSpeed)&&storedSpeed>=.2&&storedSpeed<=3)watermarkSpeed=storedSpeed;
+  if(Number.isFinite(storedSize)&&storedSize>=14&&storedSize<=48)watermarkSize=Math.round(storedSize);
+}catch(e){}
+function applyWatermarkSettings(){
+  const root=document.documentElement,scale=watermarkSize/28;
+  const tileX=Math.round(400*scale),tileY=Math.round(280*scale);
+  root.classList.toggle('watermark-off',!watermarkEnabled);
+  root.style.setProperty('--watermark-tile-x',tileX+'px');
+  root.style.setProperty('--watermark-tile-y',tileY+'px');
+  root.style.setProperty('--watermark-neg-x',-tileX+'px');
+  root.style.setProperty('--watermark-neg-y',-tileY+'px');
+  root.style.setProperty('--watermark-duration',(140*scale/watermarkSpeed).toFixed(2)+'s');
+  el('watermark-speed').value=String(watermarkSpeed);
+  el('watermark-size').value=String(watermarkSize);
+  el('watermark-speed-value').textContent=watermarkSpeed.toFixed(1)+'×';
+  el('watermark-size-value').textContent=watermarkSize+' px';
+  el('watermark-toggle').setAttribute('aria-pressed',String(watermarkEnabled));
+  el('watermark-state').textContent=watermarkEnabled?'Включён':'Выключен';
+  el('watermark-speed').disabled=!watermarkEnabled;
+  el('watermark-size').disabled=!watermarkEnabled;
+}
+el('watermark-toggle').addEventListener('click',()=>{
+  watermarkEnabled=!watermarkEnabled;
+  try{localStorage.setItem('emoji_watermark_enabled',String(watermarkEnabled))}catch(e){}
+  applyWatermarkSettings();
+});
+el('watermark-speed').addEventListener('input',event=>{
+  const next=Number(event.target.value);
+  if(!Number.isFinite(next))return;
+  watermarkSpeed=Math.round(clamp(next,.2,3)*10)/10;
+  try{localStorage.setItem('emoji_watermark_speed',String(watermarkSpeed))}catch(e){}
+  applyWatermarkSettings();
+});
+el('watermark-size').addEventListener('input',event=>{
+  const next=Number(event.target.value);
+  if(!Number.isFinite(next))return;
+  watermarkSize=clamp(Math.round(next),14,48);
+  try{localStorage.setItem('emoji_watermark_size',String(watermarkSize))}catch(e){}
+  applyWatermarkSettings();
+});
+applyWatermarkSettings();
 let isDark=false;try{isDark=localStorage.getItem('emoji_theme')==='dark'}catch(e){}
 const themeButton=el('theme');
 function applyTheme(){
