@@ -57,6 +57,25 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     assert.equal(flags.count,269,'Flags are missing from the catalogue');
     assert(flags.ready&&flags.sheet[0]>=2560,'Pre-rendered country flag atlas did not load');
     assert(flags.pixels[3]>0,'Country flag tile is transparent or missing');
+    // Body watermark must tile in both themes without obscuring the UI.
+    const watermarkLight=await page.evaluate(()=>({
+      image:getComputedStyle(document.body).backgroundImage,
+      size:getComputedStyle(document.body).backgroundSize
+    }));
+    assert(watermarkLight.image.includes('data:image/svg+xml'),'Light watermark missing');
+    assert.equal(watermarkLight.size,'320px 280px');
+    await page.evaluate(()=>{
+      isDark=true;
+      applyTheme();
+    });
+    const watermarkDark=await page.evaluate(()=>({
+      image:getComputedStyle(document.body).backgroundImage,
+      body:getComputedStyle(document.body).backgroundColor
+    }));
+    assert(watermarkDark.image.includes('data:image/svg+xml'),'Dark watermark missing');
+    assert.equal(watermarkDark.body,'rgb(14, 14, 14)');
+    assert.notEqual(watermarkLight.image,watermarkDark.image,'Dark watermark should use a different faint color');
+    await page.evaluate(()=>{isDark=false;applyTheme();});
     assert(state.atlas,'Emoji texture atlas failed to generate');
     assert(state.domEmojiButtons===0,'Emoji DOM glyphs still exist');
     assert(state.fullHeight>state.viewport,'Not all emojis are reachable by scrolling');
