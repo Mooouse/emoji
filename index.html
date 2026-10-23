@@ -171,6 +171,25 @@ html.no-emoji-frames .catalog .emoji:hover,html.dark.no-emoji-frames .catalog .e
 }
 #emoji-hover-indicator[hidden]{display:none!important}
 
+
+/* Text-based category tabs and a separate recent-emoji strip. */
+.nav{gap:9px;scrollbar-width:thin;padding:20px 0 13px}
+.nav .tab{width:auto;min-width:unset;height:39px;padding:0 15px;font-size:13px;font-weight:650;letter-spacing:0;white-space:nowrap;flex-shrink:0}
+.recent-panel{padding:13px 16px 15px;margin:0 0 18px;border:1px solid #e9ebee;background:#fcfcfd;border-radius:12px}
+.recent-head{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.recent-head h2{font-size:14px;letter-spacing:-.1px;font-weight:700;margin:0}
+.recent-count{font-size:12px;color:#98a0a9}
+.recent-grid{display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-height:38px}
+.recent-empty{font-size:12px;color:#9aa0a9;padding:10px 0}
+.recent-emoji{display:grid;place-items:center;width:42px;height:42px;font-size:27px;line-height:1;border:1px solid #e9ebed;border-radius:8px;background:#fff;cursor:pointer}
+.recent-emoji:hover{background:#fff0e5;border-color:#ffbf92}
+.recent-emoji:focus-visible{outline:2px solid #ee9b67;outline-offset:2px}
+html.dark .recent-panel{background:#1b1b1b;border-color:#343434}
+html.dark .recent-head h2{color:#ececec}
+html.dark .recent-emoji{color:#f5f5f5;background:#252525;border-color:#363636}
+html.dark .recent-emoji:hover{background:#3b2d22;border-color:#a77757}
+@media(max-width:680px){.nav .tab{font-size:12px;height:37px;padding:0 12px}.recent-panel{padding:12px}.recent-emoji{width:38px;height:38px;font-size:25px}}
+
 </style></head>
 <body>
 <header class="top"><div class="topin"><a href="./" class="logo">emoji<span>.</span></a>
@@ -200,6 +219,10 @@ html.no-emoji-frames .catalog .emoji:hover,html.dark.no-emoji-frames .catalog .e
 <section class="hero"><h1>Список Emoji 😀</h1><p>Все эмодзи в одном месте — ищи по русским названиям и нажимай, чтобы скопировать.</p>
 <div class="searchline"><label class="searchbox"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="search" type="search" placeholder="Поиск: кот, сердце, машина, солнце..." autocomplete="off" aria-label="Поиск эмодзи"></label><button type="button" id="clear" class="clear">Очистить</button></div></section>
 <nav id="nav" class="nav" aria-label="Категории"></nav>
+<section class="recent-panel" id="recent-section" aria-label="Недавно использованные эмодзи">
+  <div class="recent-head"><h2>Недавно использованные</h2><span id="recent-count" class="recent-count"></span></div>
+  <div id="recent-grid" class="recent-grid"></div>
+</section>
 <p id="count" class="count">Загрузка эмодзи...</p>
 <div class="catalog" id="catalog" tabindex="0" aria-label="Каталог эмодзи с прокруткой"><div class="virtual-layer" id="virtual-layer"></div></div>
 <div class="catalog-note">Прокручивай список вниз, чтобы увидеть все эмодзи. Никаких кнопок «Показать ещё».</div>
@@ -207,7 +230,7 @@ html.no-emoji-frames .catalog .emoji:hover,html.dark.no-emoji-frames .catalog .e
 </main>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script>
-const groups=[{id:'recent',icon:'🕓',name:'Недавно использованные'},{id:'people',icon:'😀',name:'Смайлики и люди'},{id:'nature',icon:'🐶',name:'Животные и природа'},{id:'foods',icon:'🥭',name:'Еда и напитки'},{id:'activity',icon:'⚽',name:'Действия'},{id:'places',icon:'🏖️',name:'Путешествия и места'},{id:'objects',icon:'🕯️',name:'Объекты'},{id:'symbols',icon:'⭕',name:'Символы'},{id:'flags',icon:'🚩',name:'Флаги'}];
+const groups=[{id:'people',icon:'😀',name:'Смайлики и люди'},{id:'nature',icon:'🐶',name:'Животные и природа'},{id:'foods',icon:'🥭',name:'Еда и напитки'},{id:'activity',icon:'⚽',name:'Действия'},{id:'places',icon:'🏖️',name:'Путешествия и места'},{id:'objects',icon:'🕯️',name:'Объекты'},{id:'symbols',icon:'⭕',name:'Символы'},{id:'flags',icon:'🚩',name:'Флаги'}];
 const el=id=>document.getElementById(id);
 const catalog=el('catalog'),layer=el('virtual-layer'),search=el('search'),menu=el('grid-popover'),menuToggle=el('grid-toggle');
 const historyKey='emoji_history_v1';
@@ -306,7 +329,8 @@ function updateDimensions(){
   return effectiveColumns;
 }
 function nav(){
-  el('nav').innerHTML=groups.map(g=>'<button type="button" class="tab" data-tab="'+g.id+'" title="'+g.name+'" aria-label="'+g.name+'">'+g.icon+'</button>').join('');
+  el('nav').innerHTML='<button type="button" class="tab" data-tab="all" aria-label="Показать все эмодзи">Все эмодзи</button>'+
+    groups.map(g=>'<button type="button" class="tab" data-tab="'+g.id+'" title="'+g.name+'">'+g.name+'</button>').join('');
 }
 function updateActiveTab(id){
   for(const btn of el('nav').querySelectorAll('[data-tab]')){
@@ -316,6 +340,22 @@ function updateActiveTab(id){
   }
 }
 function recentEntries(){return history.map(n=>nativeData.get(n)).filter(Boolean)}
+function renderRecent(){
+  const recent=recentEntries();
+  const grid=el('recent-grid');
+  el('recent-count').textContent=recent.length?recent.length+' из 24':'';
+  if(!recent.length){
+    grid.innerHTML='<span class="recent-empty">Скопированные эмодзи появятся здесь.</span>';
+    return;
+  }
+  grid.innerHTML=recent.map(item=>
+    '<button type="button" class="recent-emoji" data-recent-emoji="'+escapeHTML(item.native)+'" title="'+escapeHTML(item.name)+' — копировать" aria-label="Скопировать '+escapeHTML(item.name)+'">'+item.native+'</button>'
+  ).join('');
+}
+el('recent-grid').addEventListener('click',event=>{
+  const button=event.target.closest('[data-recent-emoji]');
+  if(button)copy(button.dataset.recentEmoji);
+});
 function makeRows(list,groupId){
   for(let offset=0;offset<list.length;offset+=effectiveColumns){
     model.push({kind:'emojis',key:groupId+'-'+offset,items:list.slice(offset,offset+effectiveColumns),groupId,height:rowHeight});
@@ -338,13 +378,7 @@ function rebuildRows(){
     updateActiveTab('');
   }else{
     el('count').textContent=entries.length+' эмодзи · Все категории доступны прокруткой';
-    const recent=recentEntries();
-    if(recent.length){
-      model.push({kind:'header',id:'recent',icon:'🕓',label:'Недавно использованные',count:recent.length,height:48});
-      makeRows(recent,'recent');
-    }
     for(const g of groups){
-      if(g.id==='recent')continue;
       const list=categoryData.get(g.id)||[];
       if(!list.length)continue;
       model.push({kind:'header',id:g.id,icon:g.icon,label:g.name,count:list.length,height:48});
@@ -520,10 +554,8 @@ function drawViewport(){
     const y=positions[r]-drawOrigin;
     if(record.kind==='header'){
       ctx.textBaseline='middle';ctx.textAlign='left';
-      ctx.font='21px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",emoji,sans-serif';
-      ctx.fillText(record.icon,pad+2,y+22);
       ctx.font='700 16px Arial,sans-serif';ctx.fillStyle=colors.heading;
-      ctx.fillText(record.label,pad+34,y+22);
+      ctx.fillText(record.label,pad+2,y+22);
       ctx.font='12px Arial,sans-serif';ctx.fillStyle=colors.muted;ctx.textAlign='right';
       ctx.fillText(record.count+' эмодзи',surfaceWidth-pad-4,y+22);
     }else{
@@ -625,6 +657,7 @@ el('nav').addEventListener('click',event=>{
   const i=model.findIndex(r=>r.kind==='header'&&r.id===btn.dataset.tab);
   if(i>=0)catalog.scrollTop=positions[i];
   else catalog.scrollTop=0;
+  updateActiveTab(btn.dataset.tab);
   scheduleWindow();
   catalog.focus({preventScroll:true});
 });
@@ -660,12 +693,13 @@ async function copy(native){
   if(!copied){toast('Не удалось скопировать: проверь разрешение браузера');return}
   history=[native,...history.filter(e=>e!==native)].slice(0,24);
   try{localStorage.setItem(historyKey,JSON.stringify(history))}catch(e){}
+  renderRecent();
   toast(native+' · '+(nativeData.get(native)?.name||'Эмодзи')+' — скопировано');
   // Keep all rendered rows intact on copy. Recent history rebuilds on next search/nav.
 }
 el('reset').addEventListener('click',()=>{
   history=[];try{localStorage.removeItem(historyKey)}catch(e){}
-  if(!term)refreshContent(false);
+  renderRecent();
   toast('История очищена');
 });
 
@@ -812,6 +846,7 @@ fetch('./emoji-data.json').then(r=>{if(!r.ok)throw Error('HTTP '+r.status);retur
   for(const entry of entries){categoryData.get(entry.cat)?.push(entry);nativeData.set(entry.native,entry)}
   // One-time preparation; no emoji rasterization or loading while scrolling.
   makeAtlas();
+  renderRecent();
   term=normalize(search.value);
   refreshContent();
 }).catch(err=>{
