@@ -264,10 +264,18 @@ html.dark body::after{background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D
 .watermark-range{margin-top:18px;margin-bottom:17px}
 .watermark-range input[type="range"]{width:100%;accent-color:#ef9860}
 .watermark-range input[type="range"]:disabled{opacity:.4;cursor:not-allowed}
+.watermark-speed-control{display:flex;align-items:center;gap:10px}
+.watermark-speed-control input[type="range"]{flex:1;min-width:0}
+.watermark-speed-control input[type="number"]{width:64px;flex:0 0 64px;min-height:34px;padding:4px 6px;text-align:center;color:inherit;border:1px solid #dfe2e6;border-radius:8px;background:var(--watermark-number-bg,#fff);font-size:13px;font-variant-numeric:tabular-nums}
+html.dark .watermark-speed-control input[type="number"]{--watermark-number-bg:#191919;border-color:#3b3b3b}
+.watermark-speed-control input[type="number"]:disabled{opacity:.4}
+.watermark-speed-note{font-size:11px;color:#9298a1;margin:6px 0 0}
+
 .watermark-popover .popup-foot{margin:2px 0 0}
 #watermark-menu-toggle[aria-expanded="true"] .grid-chevron{transform:rotate(180deg)}
 .watermark-menu-icon{font-size:17px;line-height:1}
 html.watermark-off body::before,html.watermark-off body::after{display:none!important;animation:none!important;will-change:auto}
+html.watermark-paused body::before,html.watermark-paused body::after{animation-play-state:paused!important;will-change:auto}
 @media(max-width:600px){
   .watermark-menu-word{display:none}
   #watermark-menu-toggle{gap:4px;padding-left:9px;padding-right:9px}
@@ -306,7 +314,7 @@ html.watermark-off body::before,html.watermark-off body::after{display:none!impo
 <div class="popup-header">Фоновые надписи</div>
 <p class="popup-hint">Настрой движение и размер an4ous / emoji.</p>
 <button type="button" id="watermark-toggle" class="border-toggle" aria-pressed="true"><span>Узор на фоне</span><strong id="watermark-state">Включён</strong></button>
-<div class="slider-field watermark-range"><label class="slider-head" for="watermark-speed">Скорость движения <output id="watermark-speed-value">1.0×</output></label><input type="range" id="watermark-speed" min="0.2" max="3" value="1" step="0.1" aria-label="Скорость движения фоновых надписей"></div>
+<div class="slider-field watermark-range"><label class="slider-head" for="watermark-speed">Скорость движения <output id="watermark-speed-value">1.0×</output></label><div class="watermark-speed-control"><input type="range" id="watermark-speed" min="0" max="50" value="1" step="0.1" aria-label="Скорость движения фоновых надписей от нуля до пятидесяти"><input type="number" id="watermark-speed-number" min="0" max="50" step="0.1" value="1" inputmode="decimal" aria-label="Точная скорость фоновых надписей от 0 до 50"></div><p class="watermark-speed-note">0 — неподвижный фон · 50 — максимальная скорость</p></div>
 <div class="slider-field watermark-range"><label class="slider-head" for="watermark-size">Размер надписей <output id="watermark-size-value">28 px</output></label><input type="range" id="watermark-size" min="14" max="48" value="28" step="1" aria-label="Размер фоновых надписей"></div>
 <p class="popup-foot">Настройки сохраняются автоматически.</p>
 </div></div>
@@ -409,25 +417,28 @@ try{
   watermarkEnabled=localStorage.getItem('emoji_watermark_enabled')!=='false';
   const storedSpeed=Number(localStorage.getItem('emoji_watermark_speed'));
   const storedSize=Number(localStorage.getItem('emoji_watermark_size'));
-  if(Number.isFinite(storedSpeed)&&storedSpeed>=.2&&storedSpeed<=3)watermarkSpeed=storedSpeed;
+  if(Number.isFinite(storedSpeed)&&storedSpeed>=0&&storedSpeed<=50)watermarkSpeed=storedSpeed;
   if(Number.isFinite(storedSize)&&storedSize>=14&&storedSize<=48)watermarkSize=Math.round(storedSize);
 }catch(e){}
 function applyWatermarkSettings(){
   const root=document.documentElement,scale=watermarkSize/28;
   const tileX=Math.round(400*scale),tileY=Math.round(280*scale);
   root.classList.toggle('watermark-off',!watermarkEnabled);
+  root.classList.toggle('watermark-paused',watermarkSpeed===0);
   root.style.setProperty('--watermark-tile-x',tileX+'px');
   root.style.setProperty('--watermark-tile-y',tileY+'px');
   root.style.setProperty('--watermark-neg-x',-tileX+'px');
   root.style.setProperty('--watermark-neg-y',-tileY+'px');
-  root.style.setProperty('--watermark-duration',(140*scale/watermarkSpeed).toFixed(2)+'s');
+  root.style.setProperty('--watermark-duration',(140*scale/(watermarkSpeed||1)).toFixed(2)+'s');
   el('watermark-speed').value=String(watermarkSpeed);
+  el('watermark-speed-number').value=String(watermarkSpeed);
   el('watermark-size').value=String(watermarkSize);
-  el('watermark-speed-value').textContent=watermarkSpeed.toFixed(1)+'×';
+  el('watermark-speed-value').textContent=watermarkSpeed===0?'0× (стоп)':watermarkSpeed.toFixed(1)+'×';
   el('watermark-size-value').textContent=watermarkSize+' px';
   el('watermark-toggle').setAttribute('aria-pressed',String(watermarkEnabled));
   el('watermark-state').textContent=watermarkEnabled?'Включён':'Выключен';
   el('watermark-speed').disabled=!watermarkEnabled;
+  el('watermark-speed-number').disabled=!watermarkEnabled;
   el('watermark-size').disabled=!watermarkEnabled;
 }
 el('watermark-toggle').addEventListener('click',()=>{
@@ -435,12 +446,17 @@ el('watermark-toggle').addEventListener('click',()=>{
   try{localStorage.setItem('emoji_watermark_enabled',String(watermarkEnabled))}catch(e){}
   applyWatermarkSettings();
 });
-el('watermark-speed').addEventListener('input',event=>{
-  const next=Number(event.target.value);
-  if(!Number.isFinite(next))return;
-  watermarkSpeed=Math.round(clamp(next,.2,3)*10)/10;
+function setWatermarkSpeed(raw){
+  const value=Number(raw);
+  if(!Number.isFinite(value))return applyWatermarkSettings();
+  watermarkSpeed=Math.round(clamp(value,0,50)*10)/10;
   try{localStorage.setItem('emoji_watermark_speed',String(watermarkSpeed))}catch(e){}
   applyWatermarkSettings();
+}
+el('watermark-speed').addEventListener('input',event=>setWatermarkSpeed(event.target.value));
+el('watermark-speed-number').addEventListener('change',event=>setWatermarkSpeed(event.target.value));
+el('watermark-speed-number').addEventListener('keydown',event=>{
+  if(event.key==='Enter')event.target.blur();
 });
 el('watermark-size').addEventListener('input',event=>{
   const next=Number(event.target.value);
