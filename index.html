@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#ffffff">
 <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=3">
-<link rel="preload" as="image" href="./flag-atlas.png">
+<link rel="preload" as="fetch" href="./emoji-data.json" crossorigin="anonymous">
 <link rel="shortcut icon" href="./favicon.svg?v=3">
 <meta name="description" content="Все эмодзи с русскими названиями — быстрый поиск, удобная сетка и копирование одним нажатием.">
 <title>Emoji — эмодзи для копирования</title>
@@ -552,6 +552,7 @@ function renderRecent(){
     for(let i=0;i<tiles.length;i++){
       const entry=recent[i],ctx=tiles[i].querySelector('canvas').getContext('2d');
       const useFlag=entry.flagIndex>=0&&flagAtlasImage;
+      if(!useFlag)paintAtlasEntry(entry);
       const sheet=useFlag?flagAtlasImage:spriteAtlas;
       const index=useFlag?entry.flagIndex:entry.atlasIndex;
       ctx.drawImage(sheet,(index%ATLAS_COLS)*ATLAS_TILE,Math.floor(index/ATLAS_COLS)*ATLAS_TILE,
@@ -697,51 +698,87 @@ const EMOJI_FONT='"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",emoji,
 let spriteAtlas=null,flagAtlasImage=null;
 const flagAtlasLoader=new Image();
 flagAtlasLoader.decoding='async';
+let flagAtlasStarted=false;
 flagAtlasLoader.onload=()=>{
   flagAtlasImage=flagAtlasLoader;
   if(entries.length){renderRecent();scheduleWindow();}
 };
 flagAtlasLoader.onerror=()=>console.warn('[emoji] Flag atlas unavailable; using system glyph fallback');
-flagAtlasLoader.src='./flag-atlas.png';
+function startFlagAtlas(){
+  if(flagAtlasStarted)return;
+  flagAtlasStarted=true;
+  flagAtlasLoader.src='./flag-atlas.png';
+}
 let viewCanvas=null,viewContext=null;
 let surfaceWidth=0,surfaceHeight=0,surfaceDpr=1,drawOrigin=0;
-let frameId=0,atlasMs=0;
+let frameId=0,atlasMs=0,atlasReadyCount=0,atlasWarmCursor=0,atlasWarmScheduled=false;
+let atlasContext=null,atlasPainted=null,firstEmojiPaintMs=0;
 let hoveredItem=null,keyboardIndex=-1,currentNavTab='';
 let hoverIndicator=null,hoverTooltip=null,surfaceRoot=null,canvasRenderCount=0;
 let lastDrawMetrics={rows:0,icons:0,ms:0};
+/*
+ * First paint is the priority: allocate an empty texture atlas, then rasterize
+ * only the on-screen glyphs synchronously when drawViewport runs.
+ * An idle-time warmer prepares everything else gradually; fast scrolling to
+ * any unprepared row paints its glyphs on demand without blank placeholders.
+ */
+function paintAtlasEntry(e){
+  if(!spriteAtlas||!e||atlasPainted[e.atlasIndex])return;
+  const index=e.atlasIndex,g=atlasContext;
+  atlasPainted[index]=1;
+  const x=(index%ATLAS_COLS)*ATLAS_TILE+ATLAS_TILE/2;
+  const y=Math.floor(index/ATLAS_COLS)*ATLAS_TILE+ATLAS_TILE/2+2;
+  const started=performance.now();
+  g.font=ATLAS_GLYPH+'px '+EMOJI_FONT;
+  const naturalWidth=g.measureText(e.native).width;
+  if(naturalWidth>ATLAS_TILE-10){
+    const fit=Math.max(8,Math.floor(ATLAS_GLYPH*(ATLAS_TILE-10)/naturalWidth));
+    g.font=fit+'px '+EMOJI_FONT;
+  }
+  g.fillText(e.native,x,y);
+  atlasReadyCount++;
+  atlasMs+=performance.now()-started;
+}
+function warmAtlasStep(deadline){
+  atlasWarmScheduled=false;
+  if(!spriteAtlas||atlasReadyCount>=entries.length)return;
+  const started=performance.now();
+  let count=0;
+  // 60 glyphs or a 3ms budget keeps background work away from scrolling.
+  while(atlasWarmCursor<entries.length&&count<60){
+    if(count>0&&(performance.now()-started>=3||(deadline&&deadline.timeRemaining()<2)))break;
+    paintAtlasEntry(entries[atlasWarmCursor++]);
+    count++;
+  }
+  if(atlasReadyCount<entries.length&&atlasWarmCursor<entries.length)scheduleAtlasWarmup();
+  else console.info('[emoji] Prepared all '+atlasReadyCount+' emoji textures in '+Math.round(atlasMs)+' ms (incremental).');
+}
+function scheduleAtlasWarmup(){
+  if(atlasWarmScheduled||!spriteAtlas||atlasReadyCount===entries.length)return;
+  atlasWarmScheduled=true;
+  if(typeof requestIdleCallback==='function')
+    requestIdleCallback(warmAtlasStep,{timeout:800});
+  else setTimeout(()=>warmAtlasStep(null),20);
+}
 function makeAtlas(){
   if(!entries.length)return;
-  const rows=Math.ceil(entries.length/ATLAS_COLS);
+  const began=performance.now();
   const atlas=document.createElement('canvas');
   atlas.width=ATLAS_COLS*ATLAS_TILE;
-  atlas.height=rows*ATLAS_TILE;
-  const g=atlas.getContext('2d',{alpha:true});
-  g.clearRect(0,0,atlas.width,atlas.height);
-  g.font=ATLAS_GLYPH+'px '+EMOJI_FONT;
-  g.textAlign='center';g.textBaseline='middle';
-  const began=performance.now();
+  atlas.height=Math.ceil(entries.length/ATLAS_COLS)*ATLAS_TILE;
+  atlasContext=atlas.getContext('2d',{alpha:true});
+  atlasContext.textAlign='center';
+  atlasContext.textBaseline='middle';
   let flagCounter=0;
   for(let i=0;i<entries.length;i++){
     const e=entries[i];
     e.atlasIndex=i;
     e.flagIndex=e.cat==='flags'?flagCounter++:-1;
-    const x=(i%ATLAS_COLS)*ATLAS_TILE+ATLAS_TILE/2;
-    const y=Math.floor(i/ATLAS_COLS)*ATLAS_TILE+ATLAS_TILE/2+2;
-    // Never use fillText(..., maxWidth): Chromium horizontally squeezes
-    // wide native emoji when a maxWidth is supplied.
-    // If a multi-codepoint glyph is exceptionally wide, shrink its font
-    // UNIFORMLY so it fits without changing its aspect ratio.
-    const naturalWidth=g.measureText(e.native).width;
-    if(naturalWidth>ATLAS_TILE-10){
-      const fit=Math.max(8,Math.floor(ATLAS_GLYPH*(ATLAS_TILE-10)/naturalWidth));
-      g.font=fit+'px '+EMOJI_FONT;
-    }
-    g.fillText(e.native,x,y);
-    if(naturalWidth>ATLAS_TILE-10)g.font=ATLAS_GLYPH+'px '+EMOJI_FONT;
   }
+  atlasPainted=new Uint8Array(entries.length);
+  atlasReadyCount=0;atlasWarmCursor=0;atlasMs=performance.now()-began;
   spriteAtlas=atlas;
-  atlasMs=performance.now()-began;
-  console.info('[emoji] Prepared all '+entries.length+' native emoji textures in '+Math.round(atlasMs)+' ms (one time).');
+  console.info('[emoji] Atlas allocated in '+Math.round(atlasMs)+' ms; visible emoji render first.');
 }
 function ensureCanvas(){
   if(viewCanvas)return;
@@ -880,6 +917,7 @@ function drawViewport(){
           // A prebuilt flag sheet fixes Windows browsers showing ISO country
           // letters rather than colored flags. It's one already-cached image.
           const useFlag=e.flagIndex>=0&&flagAtlasImage;
+          if(!useFlag)paintAtlasEntry(e);
           const sheet=useFlag?flagAtlasImage:spriteAtlas;
           const index=useFlag?e.flagIndex:e.atlasIndex;
           ctx.drawImage(sheet,(index%ATLAS_COLS)*ATLAS_TILE,Math.floor(index/ATLAS_COLS)*ATLAS_TILE,
@@ -890,6 +928,15 @@ function drawViewport(){
     }
   }
   lastDrawMetrics={rows:end-start,icons:visibleIcons,ms:performance.now()-t};
+  if(!firstEmojiPaintMs&&visibleIcons){
+    firstEmojiPaintMs=performance.now();
+    // Resource loading of flags and warming the full atlas are deferred until
+    // after the visible emoji have reached the Canvas.
+    requestAnimationFrame(()=>{
+      startFlagAtlas();
+      scheduleAtlasWarmup();
+    });
+  }
   if(!term&&model.length){
     let group='';
     for(let i=start;i>=0;i--){if(model[i].kind==='header'){group=model[i].id;break}}
