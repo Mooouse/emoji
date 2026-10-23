@@ -467,7 +467,8 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     // Startup performance regression: simulate a busy browser that cannot
     // run idle tasks at all. Visible emojis must still appear immediately,
     // and scrolling must paint not-yet-cached sprites on demand.
-    const startup=await browser.newPage();
+    const coldContext=await browser.createBrowserContext();
+    const startup=await coldContext.newPage();
     try{
       await startup.setViewport({width:1440,height:900,deviceScaleFactor:1});
       await startup.evaluateOnNewDocument(()=>{
@@ -518,7 +519,53 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
       assert(scrolled.totalPrepared<early.total,'Scrolling forced the entire sprite atlas to generate');
     }finally{
       await startup.close();
+      await coldContext.close();
     }
+
+    // The atlas and static assets must survive the next visit. Run a real
+    // offline refresh (not just a CSS screenshot) to verify persistent storage.
+    await page.waitForFunction(()=>atlasCacheSaved&&atlasReadyCount===entries.length,
+      {timeout:20000});
+    await page.waitForFunction(()=>!!navigator.serviceWorker.controller,{timeout:12000});
+    const cacheSnapshot=await page.evaluate(async()=>{
+      const atlas=await caches.open('emoji-native-atlas-v1');
+      const entry=await atlas.match(atlasCacheUrl);
+      const assets=await caches.open('emoji-site-v2-assets');
+      const json=await assets.match('./emoji-data.json');
+      const index=await assets.match('./index.html');
+      const flags=await assets.match('./flag-atlas.png');
+      return {
+        nativeAtlas:!!entry,
+        nativeBytes:entry?(await entry.blob()).size:0,
+        dataCached:!!json,
+        pageCached:!!index,
+        flagsCached:!!flags
+      };
+    });
+    console.log('saved first-visit resources',cacheSnapshot);
+    assert(cacheSnapshot.nativeAtlas&&cacheSnapshot.nativeBytes>10000,'No persisted native emoji atlas');
+    assert(cacheSnapshot.dataCached&&cacheSnapshot.pageCached&&cacheSnapshot.flagsCached,
+      'First visit did not store JSON, page and flag resources');
+    await page.setOfflineMode(true);
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>document.querySelector('#emoji-viewport')?.width>0&&
+      document.querySelector('#count').textContent.includes('1870'),{timeout:15000});
+    await page.waitForFunction(()=>atlasRestored&&atlasReadyCount===entries.length,{timeout:15000});
+    const offline=await page.evaluate(()=>({
+      restored:atlasRestored,
+      ready:atlasReadyCount,
+      total:entries.length,
+      flags:!!flagAtlasImage&&flagAtlasImage.naturalWidth>0,
+      title:document.title,
+      firstPaint:firstEmojiPaintMs,
+      cacheWrites:atlasCacheWrites
+    }));
+    console.log('offline reload from persistent atlas',offline);
+    assert(offline.restored&&offline.ready===offline.total,
+      'The return visit redrew emoji instead of reusing the cached atlas');
+    assert(offline.flags,'Color country flags were unavailable offline');
+    assert(offline.firstPaint>0,'Cached page failed to show the first emoji frame');
+    await page.setOfflineMode(false);
     assert(!errors.length,'JavaScript browser errors: '+errors.join(' | '));
     console.log('Native emoji atlas and instant canvas scrolling: browser tests PASSED');
   }finally{
