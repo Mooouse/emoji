@@ -165,6 +165,52 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     assert.equal(adjusted.sizeLabel,'42 px');
     assert.equal(adjusted.savedSpeed,'2');
     assert.equal(adjusted.savedSize,'42');
+
+    const speedRange=await page.evaluate(()=>{
+      const range=document.querySelector('#watermark-speed');
+      const number=document.querySelector('#watermark-speed-number');
+      return {min:range.min,max:range.max,step:range.step,numericMin:number.min,numericMax:number.max,numericValue:number.value};
+    });
+    assert.deepEqual([speedRange.min,speedRange.max,speedRange.step],['0','50','0.1'],'Slider must allow 0–50× in 0.1 increments');
+    assert.deepEqual([speedRange.numericMin,speedRange.numericMax,speedRange.numericValue],['0','50','2'],'Numeric input is not synchronized');
+    // Speed 0 keeps the artwork visible while pausing all animation.
+    await page.evaluate(()=>{
+      const control=document.querySelector('#watermark-speed');
+      control.value='0';
+      control.dispatchEvent(new Event('input',{bubbles:true}));
+    });
+    const zero=await page.evaluate(()=>({
+      paused:document.documentElement.classList.contains('watermark-paused'),
+      overlay:getComputedStyle(document.body,'::before').display,
+      state:getComputedStyle(document.body,'::before').animationPlayState,
+      duration:getComputedStyle(document.body,'::before').animationDuration,
+      label:document.querySelector('#watermark-speed-value').textContent,
+      saved:localStorage.getItem('emoji_watermark_speed'),
+      number:document.querySelector('#watermark-speed-number').value
+    }));
+    console.log('watermark stopped at zero',zero);
+    assert(zero.paused&&zero.state==='paused'&&zero.overlay!=='none','Speed 0 should freeze but not hide the background');
+    assert(!zero.duration.includes('Infinity')&&!zero.duration.includes('NaN'),'Speed 0 generated invalid duration');
+    assert(zero.label.includes('0×')&&zero.saved==='0'&&zero.number==='0');
+    // Max speed of 50× must generate a short finite period and persist.
+    await page.evaluate(()=>{
+      const control=document.querySelector('#watermark-speed-number');
+      control.value='50';
+      control.dispatchEvent(new Event('change',{bubbles:true}));
+    });
+    const maxSpeed=await page.evaluate(()=>({
+      paused:document.documentElement.classList.contains('watermark-paused'),
+      state:getComputedStyle(document.body,'::before').animationPlayState,
+      duration:getComputedStyle(document.body,'::before').animationDuration,
+      label:document.querySelector('#watermark-speed-value').textContent,
+      saved:localStorage.getItem('emoji_watermark_speed'),
+      slider:document.querySelector('#watermark-speed').value
+    }));
+    console.log('watermark max speed',maxSpeed);
+    assert(!maxSpeed.paused&&maxSpeed.state==='running','Speed 50 must resume the background');
+    assert.equal(maxSpeed.duration,'4.2s'); // 140 × 1.5 / 50
+    assert(maxSpeed.label.includes('50')&&maxSpeed.saved==='50'&&maxSpeed.slider==='50');
+
     await page.locator('#watermark-toggle').click();
     const off=await page.evaluate(()=>({
       cls:document.documentElement.classList.contains('watermark-off'),
