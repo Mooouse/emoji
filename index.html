@@ -15,6 +15,8 @@
 .top{height:62px;border-bottom:1px solid #e9ebee;background:#ffffffeb;backdrop-filter:blur(12px);position:relative;z-index:20}
 .topin{height:100%;max-width:1240px;padding:0 24px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:15px}
 .logo{text-decoration:none;font-size:23px;letter-spacing:-.9px;color:#24282f;font-weight:800}.logo span{color:#ef995d}
+.logo{white-space:nowrap;flex-shrink:0}
+@media(max-width:520px){.logo{font-size:17px;letter-spacing:-.6px}.topin{gap:5px}.settings{gap:5px}.tool-button{padding:8px 9px;font-size:12px}}
 .settings{display:flex;align-items:center;gap:9px}.topright{font-size:13px;color:#9299a3;margin-right:5px}
 .tool-button{border:1px solid #e3e6e9;background:#fff;border-radius:9px;color:#4b535e;padding:10px 13px;font-size:13px;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:7px;min-height:39px}
 .tool-button:hover{background:#f7f7f8;border-color:#d6dbe0}.tool-button[aria-expanded="true"]{border-color:#f0b083;background:#fff2e8;color:#77462b}
@@ -213,7 +215,7 @@ html.dark .recent-emoji:hover{background:var(--emoji-card-hover,#3b2d22);border-
 
 </style></head>
 <body>
-<header class="top"><div class="topin"><a href="./" class="logo">emoji<span>.</span></a>
+<header class="top"><div class="topin"><a href="./" class="logo" aria-label="emoji.an4ous — главная">emoji<span>.</span>an4ous</a>
 <div class="settings">
 <span class="topright">Копируй любимые эмодзи одним нажатием</span>
 <div class="grid-menu" id="grid-menu">
