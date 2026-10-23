@@ -426,7 +426,8 @@ document.addEventListener('keydown',event=>{
 let watermarkEnabled=true,watermarkSpeed=1,watermarkSize=28;
 try{
   watermarkEnabled=localStorage.getItem('emoji_watermark_enabled')!=='false';
-  const storedSpeed=Number(localStorage.getItem('emoji_watermark_speed'));
+  const storedSpeedRaw=localStorage.getItem('emoji_watermark_speed');
+  const storedSpeed=storedSpeedRaw===null?NaN:Number(storedSpeedRaw);
   const storedSize=Number(localStorage.getItem('emoji_watermark_size'));
   if(Number.isFinite(storedSpeed)&&storedSpeed>=0&&storedSpeed<=50)watermarkSpeed=storedSpeed;
   if(Number.isFinite(storedSize)&&storedSize>=14&&storedSize<=48)watermarkSize=Math.round(storedSize);
