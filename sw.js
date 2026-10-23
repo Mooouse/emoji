@@ -1,6 +1,6 @@
 /* Offline-friendly static asset cache for emoji.an4ous.
    Rendered native emoji atlases live in a separate CacheStorage bucket. */
-const VERSION='emoji-site-v2';
+const VERSION='emoji-site-v3';
 const STATIC_CACHE=VERSION+'-assets';
 const allowed=new Set(['','index.html','emoji-data.json','flag-atlas.png','favicon.svg']);
 const base=new URL('./',self.location.href).pathname;
