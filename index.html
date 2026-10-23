@@ -150,10 +150,9 @@ function updateDimensions(){
   effectiveColumns=Math.min(columns,Math.max(2,Math.floor((viewportWidth+gap)/(minimumWidth+gap))));
   cellHeight=Math.max(45,Math.round(fontSize*1.35)+17);
   rowHeight=cellHeight+gap;
-  const available=Math.max(0,window.innerHeight-catalog.getBoundingClientRect().top-75);
-  // Vertically adjustable number of visible rows: never force the page far offscreen.
-  const requested=visibleRows*rowHeight+16;
-  const height=Math.max(150,Math.min(requested,Math.max(180,available)));
+  // Vertical density is independent of the user's screen height.
+  // A 20-row setting genuinely shows 20 rows, with natural page scrolling if needed.
+  const height=visibleRows*rowHeight+16;
   catalog.style.height=Math.round(height)+'px';
   document.documentElement.style.setProperty('--emoji-cols',effectiveColumns);
   document.documentElement.style.setProperty('--emoji-size',fontSize+'px');
