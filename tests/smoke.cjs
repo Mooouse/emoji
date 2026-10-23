@@ -63,7 +63,10 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
       size:getComputedStyle(document.body).backgroundSize
     }));
     assert(watermarkLight.image.includes('data:image/svg+xml'),'Light watermark missing');
-    assert.equal(watermarkLight.size,'320px 280px');
+    assert.equal(watermarkLight.size,'360px 280px');
+    const pattern=decodeURIComponent(watermarkLight.image.match(/data:image\/svg\+xml,([^"']+)/)[1]);
+    const labels=[...pattern.matchAll(/<text[^>]*>([^<]+)<\/text>/g)].map(match=>match[1]);
+    assert.deepEqual(labels,['an4ous','emoji','emoji','an4ous'],'Background is not a true alternating checkerboard');
     await page.evaluate(()=>{
       isDark=true;
       applyTheme();
