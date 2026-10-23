@@ -343,7 +343,7 @@ rowObserver=new IntersectionObserver(records=>{
   for(const record of records){
     if(record.isIntersecting)enqueueRow(record.target);
   }
-},{root:catalog,rootMargin:'900px 0px 900px 0px',threshold:0});
+},{root:null,rootMargin:'900px 0px 900px 0px',scrollMargin:'650px 0px 650px 0px',threshold:0});
 function createRowShell(row,index){
   const node=document.createElement('div');
   node.className='virtual-row '+(row.kind==='header'?'heading':'emoji-line');
