@@ -1,0 +1,36 @@
+name: Cleanup artifacts from unsuccessful runs
+
+on:
+  workflow_run:
+    workflows:
+      - "Publish Emoji Site"
+      - "Emoji browser smoke test"
+    types:
+      - completed
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup:
+    if: ${{ github.event.workflow_run.conclusion != 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Delete artifacts belonging only to the unsuccessful run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${TARGET_RUN_ID}/artifacts?per_page=100" \
+            --jq '.artifacts[] | .id' > "${RUNNER_TEMP}/failed-run-artifacts.txt"
+          deleted=0
+          while IFS= read -r artifact_id; do
+            [[ -n "${artifact_id}" ]] || continue
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}" >/dev/null
+            echo "Removed artifact ${artifact_id} from completed run ${TARGET_RUN_ID}"
+            deleted=$((deleted + 1))
+          done < "${RUNNER_TEMP}/failed-run-artifacts.txt"
+          echo "Cleanup complete: ${deleted} artifact(s) removed from run ${TARGET_RUN_ID}"
