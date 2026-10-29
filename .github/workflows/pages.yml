@@ -47,29 +47,27 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      - name: Remove superseded Pages artifacts
-        if: success()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=github-pages&per_page=100" \
-            --jq '.artifacts[] | select(.workflow_run.id != (env.GITHUB_RUN_ID | tonumber)) | .id' |
-          while read -r artifact_id; do
-            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}"
-          done
-
-      - name: Remove current Pages upload after publication
+      - name: Remove all temporary Actions archives after publication
         if: success()
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts" \
-            --jq '.artifacts[] | select(.name == "github-pages") | .id' \
-            > "${RUNNER_TEMP}/current-pages-artifacts.txt"
-          while IFS= read -r artifact_id; do
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | [.id, .name, .size_in_bytes] | @tsv' \
+            > "${RUNNER_TEMP}/old-artifacts.tsv"
+          removed=0
+          bytes=0
+          while IFS=$'\t' read -r artifact_id artifact_name artifact_size; do
             [[ -n "${artifact_id}" ]] || continue
             gh api --method DELETE "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}" >/dev/null
-            echo "Deleted successfully deployed Pages artifact ${artifact_id}"
-          done < "${RUNNER_TEMP}/current-pages-artifacts.txt"
+            echo "Deleted ${artifact_name}: ${artifact_size} bytes"
+            removed=$((removed + 1))
+            bytes=$((bytes + artifact_size))
+          done < "${RUNNER_TEMP}/old-artifacts.tsv"
+          echo "Deleted ${removed} archived builds, ${bytes} bytes"
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | [.id, .name, .size_in_bytes] | @tsv' \
+            | tee "${RUNNER_TEMP}/remaining-artifacts.tsv"
+          test ! -s "${RUNNER_TEMP}/remaining-artifacts.tsv"
